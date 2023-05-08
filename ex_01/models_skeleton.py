@@ -49,15 +49,24 @@ class Attention(nn.Module):
         super().__init__()
         # set heads and scale (=sqrt(dim_head))
         # TODO
+        self.heads = heads
+        self.dim_head = dim_head
+        self.scale = self.dim_head ** 0.5
         # we need softmax layer and dropout
         # TODO
+        self.softmax = nn.Softmax()
+        self.dropout = nn.Dropout(dropout)
         # as well as the q linear layer
         # TODO
+        self.q = nn.Linear(dim, dim_head * dim)  # need to checked, dim, dim or this is also correct after computation
         # and the k/v linear layer (can be realized as one single linear layer
         # or as two individual ones)
         # TODO
+        self.k = nn.Linear(dim, dim_head * dim)
         # and the output linear layer followed by dropout
         # TODO
+        self.output_linear = nn.Linear(dim_head * dim, dim)
+        self.output_dropout = nn.Dropout(dropout)
 
     def forward(self, x, context=None, kv_include_self=False):
         # now compute the attention/cross-attention
