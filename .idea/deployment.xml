@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" autoUpload="Always" serverName="qi27ycyt@cip7f0.cip.cs.fau.de:22 password" remoteFilesAllowedToDisappearOnAutoupload="false">
+    <serverData>
+      <paths name="qi27ycyt@cip2a0.cip.cs.fau.de:22 password (3)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/cip/ai2022/qi27ycyt/Desktop/ADl_Ex" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="qi27ycyt@cip7f0.cip.cs.fau.de:22 password">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/cip/ai2022/qi27ycyt/Desktop/ADL_Ex" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+    </serverData>
+    <option name="myAutoUpload" value="ALWAYS" />
+  </component>
+</project>
