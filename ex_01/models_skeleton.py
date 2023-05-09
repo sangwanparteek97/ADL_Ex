@@ -74,7 +74,7 @@ class Attention(nn.Module):
         # don't forget the dropout after the attention 
         # and before the multiplication w. 'v'
         # the output should be in the shape 'b n (h d)'
-        b, n, _, h = *x.shape, self.heads
+        b, n, _, h = x.shape
         if context is None:
             context = x
 
@@ -82,8 +82,19 @@ class Attention(nn.Module):
             # cross attention requires CLS token includes itself as key / value
             context = torch.cat((x, context), dim=1)
 
-            # TODO: attention
+        # TODO: attention
+        q = self.q(x)
+        k = self.k(x)
+        v = self.v(x)
 
+        # calculating attention
+        dot_product = torch.matmul(q, k.transpose(2, 3)) / torch.tensor(self.scale)
+        attention = self.softmax(dot_product)
+        attention = self.dropout(attention)
+        out = torch.matmul(attention, v)
+        out = out.view(b, n, self.heads * self.dim_head)  # doubt
+        out = self.output_linear(out)
+        out = self.output_dropout(out)
         return out
 
     # ViT & CrossViT
@@ -118,6 +129,9 @@ class ProjectInOut(nn.Module):
 
     def forward(self, x, *args, **kwargs):
         # TODO
+        x = self.project_in(x)
+        x = self.fn(x)  # function that transforms data into new dim
+        x = self.project_out(x)  # output dimension
         return x
 
 
