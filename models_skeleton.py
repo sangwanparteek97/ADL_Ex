@@ -51,13 +51,14 @@ class Attention(nn.Module):
         self.dropout = nn.Dropout(dropout)
         # as well as the q linear layer
         # TODO
-        self.q = nn.Linear(dim,dim_head*dim)
+        self.q = nn.Linear(dim,dim_head*heads)
         # and the k/v linear layer (can be realized as one single linear layer
-        self.k = nn.Linear(dim, dim_head*dim)
+        self.k = nn.Linear(dim, dim_head*heads)
         # or as two individual ones)
+        self.v = nn.Linear(dim, dim_head * heads)
         # TODO
         # and the output linear layer followed by dropout
-        self.output_linear = nn.Linear(dim_head*dim,dim)
+        self.output_linear = nn.Linear(dim_head*heads,dim)
         self.followed_droput = nn.Dropout(dropout)
         # TODO
 
