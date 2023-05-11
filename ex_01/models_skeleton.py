@@ -66,7 +66,7 @@ class Attention(nn.Module):
         # and the output linear layer followed by dropout
         self.v = nn.Linear(dim, dim_head * heads)
         # TODO
-        self.output_linear = nn.Linear(dim_head * dim, dim)
+        self.output_linear = nn.Linear(dim_head * heads, dim)#### mistake
         self.output_dropout = nn.Dropout(dropout)
 
     def forward(self, x, context=None, kv_include_self=False):
@@ -75,7 +75,7 @@ class Attention(nn.Module):
         # don't forget the dropout after the attention 
         # and before the multiplication w. 'v'
         # the output should be in the shape 'b n (h d)'
-        b, n, h, d = x.unsqueeze(1).shape
+        b, n, _, h = *x.shape, self.heads
         if context is None:
             context = x
 
@@ -93,9 +93,10 @@ class Attention(nn.Module):
         attention = self.softmax(dot_product)
         attention = self.dropout(attention)
         out = torch.matmul(attention, v)
-        out = out.view(b, n, self.heads * self.dim_head)  # doubt
-        out = out.view(b, n, self.heads * self.dim_head)
+        #print(out.shape)
+        #out = out.view(b, n, self.heads * self.dim_head)  # doubt
         out = self.output_linear(out)
+        #print(f'output:{out.shape}')
         out = self.output_dropout(out)
         return out
 
