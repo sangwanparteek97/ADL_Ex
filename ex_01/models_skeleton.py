@@ -75,7 +75,7 @@ class Attention(nn.Module):
         # don't forget the dropout after the attention 
         # and before the multiplication w. 'v'
         # the output should be in the shape 'b n (h d)'
-        b, n, _, h = x.shape
+        b, n, h, d = x.unsqueeze(1).shape
         if context is None:
             context = x
 
@@ -89,11 +89,12 @@ class Attention(nn.Module):
         v = self.v(x)
 
         # calculating attention
-        dot_product = torch.matmul(q, k.transpose(2, 3)) / torch.tensor(self.scale)
+        dot_product = torch.matmul(q, k.transpose(1, 2)) / torch.tensor(self.scale)
         attention = self.softmax(dot_product)
         attention = self.dropout(attention)
         out = torch.matmul(attention, v)
         out = out.view(b, n, self.heads * self.dim_head)  # doubt
+        out = out.view(b, n, self.heads * self.dim_head)
         out = self.output_linear(out)
         out = self.output_dropout(out)
         return out

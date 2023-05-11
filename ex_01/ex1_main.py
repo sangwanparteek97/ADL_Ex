@@ -5,7 +5,7 @@ from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader
 from torch import optim
 
-from models import ViT, CrossViT
+from models_skeleton import ViT, CrossViT
 
 
 def parse_args():
@@ -58,12 +58,15 @@ def test(model, device, test_loader, criterion, set="Test"):
     print('\n{} set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         set, test_loss, correct, len(test_loader.dataset),
         100. * correct / len(test_loader.dataset)))
-
+    return correct/len(test_loader.dataset)
 
 def run(args):
     # Download and load the training data
     transform = transforms.Compose([transforms.ToTensor(),
                                     # ImageNet mean/std values should also fit okayish for CIFAR
+                                    transforms.RandomCrop(32, padding=4),
+                                    transforms.RandomHorizontalFlip(),
+                                    #transforms.ToTensor(),
                                     transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
                                     ])
 
@@ -106,10 +109,15 @@ def run(args):
         device = torch.device("cpu")
     model.to(device)
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
-
+    best_val_acc = 0.0
+    best_epoch = 0
     for epoch in range(1, args.epochs + 1):
         train(model, trainloader, optimizer, criterion, device, epoch)
-        test(model, device, valloader, criterion, set="Validation")
+        val_acc = test(model, device, valloader, criterion, set="Validation")
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            best_epoch = epoch
+            torch.save(model.state_dict(), "best_model.pt")
 
     test(model, device, testloader, criterion)
 
