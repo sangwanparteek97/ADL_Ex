@@ -146,18 +146,32 @@ class CrossTransformer(nn.Module):
         super().__init__()
         self.layers = nn.ModuleList([])
         # TODO: create # depth encoders using ProjectInOut
-        # Note: no positional FFN here 
+        # Note: no positional FFN here
+        for d in range(depth): #### create twice because we want to project small and large patches and then cross attention with each other.
+            ### small patch*large patch and large patch *small patch so two layers
+            self.layers.append(nn.ModuleList([
+                ProjectInOut(sm_dim, lg_dim,
+                             PreNorm(lg_dim, Attention(lg_dim, heads=heads, dim_head=dim_head, dropout=dropout))),
+                ProjectInOut(lg_dim, sm_dim,
+                             PreNorm(sm_dim, Attention(sm_dim, heads=heads, dim_head=dim_head, dropout=dropout)))
+            ]))
+
 
     def forward(self, sm_tokens, lg_tokens):
         (sm_cls, sm_patch_tokens), (lg_cls, lg_patch_tokens) = map(lambda t: (t[:, :1], t[:, 1:]),
                                                                    (sm_tokens, lg_tokens))
 
-        # Forward pass through the layers, 
-        # cross attend to 
-        # 1. small cls token to large patches and
-        # 2. large cls token to small patches
+        # Forward pass through the layers,
+        for sm_attend_lg, lg_attend_sm in self.layers:  ##defined two projinout layers which has cross attention
+            # cross attend to
+            # 1. small cls token to large patches and ########doubt small cls or small patch???????
+            # 2. large cls token to small patches
+            sm_cls = sm_attend_lg(sm_patch_tokens, context=lg_patch_tokens, kv_include_self=True) + sm_cls
+            lg_cls = lg_attend_sm(lg_patch_tokens, context=sm_patch_tokens, kv_include_self=True) + lg_cls
+
         # TODO
-        # finally concat sm/lg cls tokens with patch tokens 
+        # finally concat sm/lg cls tokens with patch tokens
+
         # TODO
         return sm_tokens, lg_tokens
 
