@@ -166,12 +166,13 @@ class CrossTransformer(nn.Module):
             # cross attend to
             # 1. small cls token to large patches and ########doubt small cls or small patch???????
             # 2. large cls token to small patches
-            sm_cls = sm_attend_lg(sm_patch_tokens, context=lg_patch_tokens, kv_include_self=True) + sm_cls
-            lg_cls = lg_attend_sm(lg_patch_tokens, context=sm_patch_tokens, kv_include_self=True) + lg_cls
+            sm_cls = sm_attend_lg(sm_cls, context=lg_patch_tokens, kv_include_self=True) + sm_cls
+            lg_cls = lg_attend_sm(lg_cls, context=sm_patch_tokens, kv_include_self=True) + lg_cls
 
         # TODO
         # finally concat sm/lg cls tokens with patch tokens
-
+        sm_tokens = torch.cat((sm_cls,sm_patch_tokens),1)
+        lg_tokens = torch.cat((lg_cls, lg_patch_tokens),1)
         # TODO
         return sm_tokens, lg_tokens
 
@@ -224,8 +225,11 @@ class ImageEmbedder(nn.Module):
 
         # create layer that re-arranges the image patches
         # and embeds them with layer norm + linear projection + layer norm
-        self.to_patch_embedding = nn.Sequential(
-            # TODO
+        self.to_patch_embedding = nn.Sequential(###Rearrange layes
+           # TODO
+            nn.LayerNorm(),
+            nn.Linear(),
+            nn.LayerNorm()
         )
         # create/initialize #dim-dimensional positional embedding (will be learned)
         # TODO
