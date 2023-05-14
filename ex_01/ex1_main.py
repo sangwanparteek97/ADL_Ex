@@ -64,9 +64,10 @@ def run(args):
     # Download and load the training data
     transform = transforms.Compose([transforms.ToTensor(),
                                     # ImageNet mean/std values should also fit okayish for CIFAR
-                                    transforms.RandomCrop(32, padding=4),
+                                    transforms.RandomCrop(32),
                                     transforms.RandomHorizontalFlip(),
-                                    transforms.ColorJitter(brightness=1.0, contrast=0.5, saturation=1, hue=0.1),
+                                    # transforms.CenterCrop(size=20),
+                                    # transforms.ColorJitter(brightness=1.0, contrast=0.5, saturation=1, hue=0.1),
                                     #transforms.ToTensor(),
                                     transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
                                     ])
@@ -126,3 +127,6 @@ def run(args):
 if __name__ == '__main__':
     args = parse_args()
     run(args)
+
+## --batch-size 128 --lr 0.009 --model vit --epochs 50 for vit
+###--batch-size 400 --lr 0.01  for Resnet

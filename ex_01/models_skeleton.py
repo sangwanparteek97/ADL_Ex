@@ -130,7 +130,9 @@ class ProjectInOut(nn.Module):
         self.project_in = nn.Linear(dim_in, dim_out) if need_projection else nn.Identity()
         self.project_out = nn.Linear(dim_out, dim_in) if need_projection else nn.Identity()
 
-    def forward(self, x, *args, **kwargs):
+    def forward(self, x, *args, **kwargs):   ###note :This projection step allows the original input
+                                             # data to be combined with the newly learned features, resulting in a richer
+                                             # and more expressive representation of the input.
         # TODO
         x = self.project_in(x)
         x = self.fn(x)  # function that transforms data into new dim
@@ -195,15 +197,24 @@ class MultiScaleEncoder(nn.Module):
     ):
         super().__init__()
         self.layers = nn.ModuleList([])
-        for _ in range(depth):
+        for _ in range(depth): ### here we take modeule list because se didnt fix layer sequence.
             self.layers.append(nn.ModuleList([
                 # 2 transformer branches, one for small, one for large patchs
+                Transformer(dim=sm_dim, dropout=dropout, **sm_enc_params),
+                Transformer(dim=lg_dim, dropout=dropout, **lg_enc_params),
                 # + 1 cross transformer block
+                CrossTransformer(sm_dim, lg_dim, cross_attn_depth, cross_attn_heads,
+                                 cross_attn_dim_head,dropout)
+
             ]))
 
     def forward(self, sm_tokens, lg_tokens):
         # forward through the transformer encoders and cross attention block
-        return sm_tokens, lg_tokens
+        for sm_patch_transformer, large_patch_transformer , cross_transformer in self.layers:
+            sm_tokens = sm_patch_transformer(sm_tokens) ### normal attention for each small andlarge tokens
+            lg_tokens = large_patch_transformer(lg_tokens)
+            sm_tokens,lg_tokens = cross_transformer(sm_tokens,lg_tokens) ##cross atention.
+        return sm_tokens, lg_tokens  ###same dimension
 
 
 # CrossViT (could actually also be used in ViT)
