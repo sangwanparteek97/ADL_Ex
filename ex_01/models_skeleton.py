@@ -50,7 +50,7 @@ class Attention(nn.Module):
         # set heads and scale (=sqrt(dim_head))
         # TODO
         self.heads = heads
-        self.dim_head = dim_head
+        self.dim_head = dim_head  # dimension of each attention head
         self.scale = self.dim_head ** 0.5
         # we need softmax layer and dropout
         # TODO
@@ -58,7 +58,7 @@ class Attention(nn.Module):
         self.dropout = nn.Dropout(dropout)
         # as well as the q linear layer
         # TODO
-        self.q = nn.Linear(dim, dim_head * heads)  # need to checked, dim, dim or this is also correct after computation
+        self.q = nn.Linear(dim, dim_head * heads)
         # and the k/v linear layer (can be realized as one single linear layer
         # or as two individual ones)
         # TODO
@@ -66,7 +66,7 @@ class Attention(nn.Module):
         # and the output linear layer followed by dropout
         self.v = nn.Linear(dim, dim_head * heads)
         # TODO
-        self.output_linear = nn.Linear(dim_head * heads, dim)#### mistake
+        self.output_linear = nn.Linear(dim_head * heads, dim)  #### mistake
         self.output_dropout = nn.Dropout(dropout)
 
     def forward(self, x, context=None, kv_include_self=False):
@@ -93,10 +93,10 @@ class Attention(nn.Module):
         attention = self.softmax(dot_product)
         attention = self.dropout(attention)
         out = torch.matmul(attention, v)
-        #print(out.shape)
-        #out = out.view(b, n, self.heads * self.dim_head)  # doubt
+        # print(out.shape)
+        # out = out.view(b, n, self.heads * self.dim_head)  # doubt
         out = self.output_linear(out)
-        #print(f'output:{out.shape}')
+        # print(f'output:{out.shape}')
         out = self.output_dropout(out)
         return out
 
@@ -130,9 +130,9 @@ class ProjectInOut(nn.Module):
         self.project_in = nn.Linear(dim_in, dim_out) if need_projection else nn.Identity()
         self.project_out = nn.Linear(dim_out, dim_in) if need_projection else nn.Identity()
 
-    def forward(self, x, *args, **kwargs):   ###note :This projection step allows the original input
-                                             # data to be combined with the newly learned features, resulting in a richer
-                                             # and more expressive representation of the input.
+    def forward(self, x, *args, **kwargs):  ###note :This projection step allows the original input
+        # data to be combined with the newly learned features, resulting in a richer
+        # and more expressive representation of the input.
         # TODO
         x = self.project_in(x)
         x = self.fn(x)  # function that transforms data into new dim
@@ -149,7 +149,8 @@ class CrossTransformer(nn.Module):
         self.layers = nn.ModuleList([])
         # TODO: create # depth encoders using ProjectInOut
         # Note: no positional FFN here
-        for d in range(depth): #### create twice because we want to project small and large patches and then cross attention with each other.
+        for d in range(
+                depth):  #### create twice because we want to project small and large patches and then cross attention with each other.
             ### small patch*large patch and large patch *small patch so two layers
             self.layers.append(nn.ModuleList([
                 ProjectInOut(sm_dim, lg_dim,
@@ -157,7 +158,6 @@ class CrossTransformer(nn.Module):
                 ProjectInOut(lg_dim, sm_dim,
                              PreNorm(sm_dim, Attention(sm_dim, heads=heads, dim_head=dim_head, dropout=dropout)))
             ]))
-
 
     def forward(self, sm_tokens, lg_tokens):
         (sm_cls, sm_patch_tokens), (lg_cls, lg_patch_tokens) = map(lambda t: (t[:, :1], t[:, 1:]),
@@ -173,8 +173,8 @@ class CrossTransformer(nn.Module):
 
         # TODO
         # finally concat sm/lg cls tokens with patch tokens
-        sm_tokens = torch.cat((sm_cls,sm_patch_tokens),1)
-        lg_tokens = torch.cat((lg_cls, lg_patch_tokens),1)
+        sm_tokens = torch.cat((sm_cls, sm_patch_tokens), 1)
+        lg_tokens = torch.cat((lg_cls, lg_patch_tokens), 1)
         # TODO
         return sm_tokens, lg_tokens
 
@@ -197,23 +197,23 @@ class MultiScaleEncoder(nn.Module):
     ):
         super().__init__()
         self.layers = nn.ModuleList([])
-        for _ in range(depth): ### here we take modeule list because se didnt fix layer sequence.
+        for _ in range(depth):  ### here we take modeule list because se didnt fix layer sequence.
             self.layers.append(nn.ModuleList([
                 # 2 transformer branches, one for small, one for large patchs
                 Transformer(dim=sm_dim, dropout=dropout, **sm_enc_params),
                 Transformer(dim=lg_dim, dropout=dropout, **lg_enc_params),
                 # + 1 cross transformer block
                 CrossTransformer(sm_dim, lg_dim, cross_attn_depth, cross_attn_heads,
-                                 cross_attn_dim_head,dropout)
+                                 cross_attn_dim_head, dropout)
 
             ]))
 
     def forward(self, sm_tokens, lg_tokens):
         # forward through the transformer encoders and cross attention block
-        for sm_patch_transformer, large_patch_transformer , cross_transformer in self.layers:
-            sm_tokens = sm_patch_transformer(sm_tokens) ### normal attention for each small andlarge tokens
+        for sm_patch_transformer, large_patch_transformer, cross_transformer in self.layers:
+            sm_tokens = sm_patch_transformer(sm_tokens)  ### normal attention for each small andlarge tokens
             lg_tokens = large_patch_transformer(lg_tokens)
-            sm_tokens,lg_tokens = cross_transformer(sm_tokens,lg_tokens) ##cross atention.
+            sm_tokens, lg_tokens = cross_transformer(sm_tokens, lg_tokens)  ##cross atention.
         return sm_tokens, lg_tokens  ###same dimension
 
 
@@ -236,8 +236,8 @@ class ImageEmbedder(nn.Module):
 
         # create layer that re-arranges the image patches
         # and embeds them with layer norm + linear projection + layer norm
-        self.to_patch_embedding = nn.Sequential(###Rearrange layes
-           # TODO
+        self.to_patch_embedding = nn.Sequential(  # Rearrange layers
+            # TODO
             nn.LayerNorm(),
             nn.Linear(),
             nn.LayerNorm()
