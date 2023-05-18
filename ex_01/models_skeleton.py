@@ -236,22 +236,31 @@ class ImageEmbedder(nn.Module):
 
         # create layer that re-arranges the image patches
         # and embeds them with layer norm + linear projection + layer norm
-        self.to_patch_embedding = nn.Sequential(###Rearrange layes
+        self.to_patch_embedding = nn.Sequential(
+            Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_dim, p2=patch_dim),
+            nn.LayerNorm(patch_dim),
+            nn.Linear(patch_dim, dim),
+            nn.LayerNorm(dim),
+            ###copied from function below and changed dimention
            # TODO
-            nn.LayerNorm(),
-            nn.Linear(),
-            nn.LayerNorm()
+
         )
         # create/initialize #dim-dimensional positional embedding (will be learned)
         # TODO
+        ##for each patch we are doing this
+        self.position = nn.Parameter(torch.randn(1, num_patches, dim),requires_grad=True) ##required grad learns weights
         # create #dim cls tokens (for each patch embedding)
         # TODO
+        self.class_tokens = nn.Parameter(torch.randn(1, 1, dim),requires_grad=True) ##one cls token for 1 image for each side
         # create dropput layer
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, img):
         # forward through patch embedding layer
+        x = self.to_patch_embedding(img)
+        x_class = ###### ????/
         # concat class tokens
+        x = torch.cat((x,x_class),dim=1)
         # and add positional embedding
         return self.dropout(x)
 
