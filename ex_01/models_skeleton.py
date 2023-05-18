@@ -50,7 +50,7 @@ class Attention(nn.Module):
         # set heads and scale (=sqrt(dim_head))
         # TODO
         self.heads = heads
-        self.dim_head = dim_head
+        self.dim_head = dim_head  # dimension of each attention head
         self.scale = self.dim_head ** 0.5
         # we need softmax layer and dropout
         # TODO
@@ -236,32 +236,22 @@ class ImageEmbedder(nn.Module):
 
         # create layer that re-arranges the image patches
         # and embeds them with layer norm + linear projection + layer norm
-        self.to_patch_embedding = nn.Sequential(
-            Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_dim, p2=patch_dim),
-            nn.LayerNorm(patch_dim),
-            nn.Linear(patch_dim, dim),
-            nn.LayerNorm(dim),
-            ###copied from function below and changed dimention
+        self.to_patch_embedding = nn.Sequential(###Rearrange layes
            # TODO
-
+            nn.LayerNorm(),
+            nn.Linear(),
+            nn.LayerNorm()
         )
         # create/initialize #dim-dimensional positional embedding (will be learned)
         # TODO
-        ##for each patch we are doing this
-        self.position = nn.Parameter(torch.randn(1, num_patches, dim),requires_grad=True) ##required grad learns weights
         # create #dim cls tokens (for each patch embedding)
         # TODO
-        self.class_tokens = nn.Parameter(torch.randn(1, 1, dim),requires_grad=True) ##one cls token for 1 image for each side
         # create dropput layer
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, img):
         # forward through patch embedding layer
-        x = self.to_patch_embedding(img)
-        b, n, _ = x.shape
-        x_class =  repeat(self.cls_token, '1 1 d -> b 1 d', b=b)###### copied from following code
         # concat class tokens
-        x = torch.cat((x,x_class),dim=1)
         # and add positional embedding
         return self.dropout(x)
 
