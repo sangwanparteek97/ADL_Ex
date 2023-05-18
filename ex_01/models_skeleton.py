@@ -258,7 +258,8 @@ class ImageEmbedder(nn.Module):
     def forward(self, img):
         # forward through patch embedding layer
         x = self.to_patch_embedding(img)
-        x_class = ###### ????/
+        b, n, _ = x.shape
+        x_class =  repeat(self.cls_token, '1 1 d -> b 1 d', b=b)###### copied from following code
         # concat class tokens
         x = torch.cat((x,x_class),dim=1)
         # and add positional embedding
