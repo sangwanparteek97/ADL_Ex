@@ -403,8 +403,8 @@ class CrossViT(nn.Module):
         # TODO
         sm_tokens ,lg_tokens = self.multi_scale_encoder(small_patch_tokens,large_patch_tokens)
         ##get class tokens first column class is same
-        sm_cls = [t[:, 0] for t in (sm_tokens, lg_tokens)]
-        lg_cls = [t[:, 0] for t in (sm_tokens, lg_tokens)]
+        sm_cls = [token[:, 0] for token in (sm_tokens, lg_tokens)]
+        lg_cls = [token[:, 0] for token in (sm_tokens, lg_tokens)]
         # call the mlp heads w. the class tokens 
         # TODO
         sm_logits = self.sm_mlp_head(sm_cls)
