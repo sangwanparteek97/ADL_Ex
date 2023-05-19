@@ -237,7 +237,7 @@ class ImageEmbedder(nn.Module):
         # create layer that re-arranges the image patches
         # and embeds them with layer norm + linear projection + layer norm
         self.to_patch_embedding = nn.Sequential(
-            Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_dim, p2=patch_dim),
+            Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_size, p2=patch_size),
             nn.LayerNorm(patch_dim),
             nn.Linear(patch_dim, dim),
             nn.LayerNorm(dim),
@@ -259,10 +259,12 @@ class ImageEmbedder(nn.Module):
         # forward through patch embedding layer
         x = self.to_patch_embedding(img)
         b, n, _ = x.shape
-        x_class =  repeat(self.cls_token, '1 1 d -> b 1 d', b=b)###### copied from following code
+        #print(x.shape)
+        x_class =  repeat(self.class_tokens, '1 1 d -> b 1 d', b=b)###### copied from following code
         # concat class tokens
         x = torch.cat((x,x_class),dim=1)
         # and add positional embedding
+        #print(x.shape)
         return self.dropout(x)
 
 
@@ -308,12 +310,13 @@ class ViT(nn.Module):
         # patch embedding
         x = self.to_patch_embedding(img)
         b, n, _ = x.shape
-
+        #print(x.shape)
         # concat class token
         cls_tokens = repeat(self.cls_token, '1 1 d -> b 1 d', b=b)
         x = torch.cat((cls_tokens, x), dim=1)
         # add positional embedding
         x += self.pos_embedding[:, :(n + 1)]
+        #print(x.shape)
         # apply dropout
         x = self.dropout(x)
 
@@ -396,17 +399,26 @@ class CrossViT(nn.Module):
         # apply image embedders
         # TODO
         small_patch_tokens = self.small_img_emb(img)
-        large_patch_tokens = self.larg_img_emb
+        large_patch_tokens = self.larg_img_emb(img)
         ###feed these to make dimention same
+        # print(small_patch_tokens)
+        # print(large_patch_tokens)
 
         # and the multi-scale encoder
         # TODO
         sm_tokens ,lg_tokens = self.multi_scale_encoder(small_patch_tokens,large_patch_tokens)
         ##get class tokens first column class is same
-        sm_cls = [token[:, 0] for token in (sm_tokens, lg_tokens)]
-        lg_cls = [token[:, 0] for token in (sm_tokens, lg_tokens)]
-        # call the mlp heads w. the class tokens 
+        # sm_cls = [token[:, 0] for token in (sm_tokens, lg_tokens)]
+        # lg_cls = [token[:, 0] for token in (sm_tokens, lg_tokens)]
+        #sm_cls, lg_cls = [token[0][:, 0] for token in zip(sm_tokens, lg_tokens)]
         # TODO
+        sm_cls, lg_cls = map(lambda token: token[:, 0], (sm_tokens, lg_tokens))
+        # print(sm_cls.shape)
+        # print(lg_cls)
+
+
+
+
         sm_logits = self.sm_mlp_head(sm_cls)
         lg_logits = self.lg_mlp_head(lg_cls)
 
