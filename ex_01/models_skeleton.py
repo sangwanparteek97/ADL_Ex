@@ -66,7 +66,7 @@ class Attention(nn.Module):
         # and the output linear layer followed by dropout
         self.v = nn.Linear(dim, dim_head * heads)
         # TODO
-        self.output_linear = nn.Linear(dim_head * heads, dim)#### mistake
+        self.output_linear = nn.Linear(dim_head * heads, dim)  #### mistake
         self.output_dropout = nn.Dropout(dropout)
 
     def forward(self, x, context=None, kv_include_self=False):
@@ -81,7 +81,7 @@ class Attention(nn.Module):
 
         if kv_include_self:
             # cross attention requires CLS token includes itself as key / value
-            context = torch.cat((x, context), dim=1)
+            x = torch.cat((x, context), dim=1)
 
         # TODO: attention
         q = self.q(x)
@@ -93,10 +93,10 @@ class Attention(nn.Module):
         attention = self.softmax(dot_product)
         attention = self.dropout(attention)
         out = torch.matmul(attention, v)
-        #print(out.shape)
-        #out = out.view(b, n, self.heads * self.dim_head)  # doubt
+        # print("Matmul", out.shape)  [b, n, h*d] 64, 17, 512
+        # out = out.view(b, n, self.heads * self.dim_head)  # doubt
         out = self.output_linear(out)
-        #print(f'output:{out.shape}')
+        # print(f'output:{out.shape}') # [b, n, d] 64, 17, 64
         out = self.output_dropout(out)
         return out
 
@@ -130,9 +130,9 @@ class ProjectInOut(nn.Module):
         self.project_in = nn.Linear(dim_in, dim_out) if need_projection else nn.Identity()
         self.project_out = nn.Linear(dim_out, dim_in) if need_projection else nn.Identity()
 
-    def forward(self, x, *args, **kwargs):   ###note :This projection step allows the original input
-                                             # data to be combined with the newly learned features, resulting in a richer
-                                             # and more expressive representation of the input.
+    def forward(self, x, *args, **kwargs):  ###note :This projection step allows the original input
+        # data to be combined with the newly learned features, resulting in a richer
+        # and more expressive representation of the input.
         # TODO
         x = self.project_in(x)
         x = self.fn(x)  # function that transforms data into new dim
@@ -149,15 +149,15 @@ class CrossTransformer(nn.Module):
         self.layers = nn.ModuleList([])
         # TODO: create # depth encoders using ProjectInOut
         # Note: no positional FFN here
-        for d in range(depth): #### create twice because we want to project small and large patches and then cross attention with each other.
-            ### small patch*large patch and large patch *small patch so two layers
+        for _ in range(depth):
+            # create twice because we want to project small and large patches and then cross attention with each other.
+            # small patch * large patch and large patch * small patch so two layers
             self.layers.append(nn.ModuleList([
                 ProjectInOut(sm_dim, lg_dim,
                              PreNorm(lg_dim, Attention(lg_dim, heads=heads, dim_head=dim_head, dropout=dropout))),
                 ProjectInOut(lg_dim, sm_dim,
                              PreNorm(sm_dim, Attention(sm_dim, heads=heads, dim_head=dim_head, dropout=dropout)))
             ]))
-
 
     def forward(self, sm_tokens, lg_tokens):
         (sm_cls, sm_patch_tokens), (lg_cls, lg_patch_tokens) = map(lambda t: (t[:, :1], t[:, 1:]),
@@ -173,8 +173,8 @@ class CrossTransformer(nn.Module):
 
         # TODO
         # finally concat sm/lg cls tokens with patch tokens
-        sm_tokens = torch.cat((sm_cls,sm_patch_tokens),1)
-        lg_tokens = torch.cat((lg_cls, lg_patch_tokens),1)
+        sm_tokens = torch.cat((sm_cls, sm_patch_tokens), 1)
+        lg_tokens = torch.cat((lg_cls, lg_patch_tokens), 1)
         # TODO
         return sm_tokens, lg_tokens
 
@@ -197,24 +197,24 @@ class MultiScaleEncoder(nn.Module):
     ):
         super().__init__()
         self.layers = nn.ModuleList([])
-        for _ in range(depth): ### here we take modeule list because se didnt fix layer sequence.
+        for _ in range(depth):  # here we take module list because se didnt fix layer sequence.
             self.layers.append(nn.ModuleList([
-                # 2 transformer branches, one for small, one for large patchs
+                # 2 transformer branches, one for small, one for large patches
                 Transformer(dim=sm_dim, dropout=dropout, **sm_enc_params),
                 Transformer(dim=lg_dim, dropout=dropout, **lg_enc_params),
                 # + 1 cross transformer block
                 CrossTransformer(sm_dim, lg_dim, cross_attn_depth, cross_attn_heads,
-                                 cross_attn_dim_head,dropout)
+                                 cross_attn_dim_head, dropout)
 
             ]))
 
     def forward(self, sm_tokens, lg_tokens):
         # forward through the transformer encoders and cross attention block
-        for sm_patch_transformer, large_patch_transformer , cross_transformer in self.layers:
-            sm_tokens = sm_patch_transformer(sm_tokens) ### normal attention for each small andlarge tokens
+        for sm_patch_transformer, large_patch_transformer, cross_transformer in self.layers:
+            sm_tokens = sm_patch_transformer(sm_tokens)  # normal attention for each small and large tokens
             lg_tokens = large_patch_transformer(lg_tokens)
-            sm_tokens,lg_tokens = cross_transformer(sm_tokens,lg_tokens) ##cross atention.
-        return sm_tokens, lg_tokens  ###same dimension
+            sm_tokens, lg_tokens = cross_transformer(sm_tokens, lg_tokens)  # cross attention.
+        return sm_tokens, lg_tokens  # same dimension
 
 
 # CrossViT (could actually also be used in ViT)
@@ -241,30 +241,32 @@ class ImageEmbedder(nn.Module):
             nn.LayerNorm(patch_dim),
             nn.Linear(patch_dim, dim),
             nn.LayerNorm(dim),
-            ###copied from function below and changed dimention
-           # TODO
-
+            # copied from function below and changed dimension
+            # TODO
         )
         # create/initialize #dim-dimensional positional embedding (will be learned)
         # TODO
-        ##for each patch we are doing this
-        self.position = nn.Parameter(torch.randn(1, num_patches, dim),requires_grad=True) ##required grad learns weights
+        # for each patch we are doing this
+        self.position = nn.Parameter(torch.randn(1, num_patches + 1, dim),
+                                     requires_grad=True)  # required grad learns weights
         # create #dim cls tokens (for each patch embedding)
         # TODO
-        self.class_tokens = nn.Parameter(torch.randn(1, 1, dim),requires_grad=True) ##one cls token for 1 image for each side
-        # create dropput layer
+        self.class_tokens = nn.Parameter(torch.randn(1, 1, dim),
+                                         requires_grad=True)  # one cls token for 1 image for each side
+        # create dropout layer
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, img):
         # forward through patch embedding layer
         x = self.to_patch_embedding(img)
         b, n, _ = x.shape
-        #print(x.shape)
-        x_class =  repeat(self.class_tokens, '1 1 d -> b 1 d', b=b)###### copied from following code
+        # print(x.shape)
+        x_class = repeat(self.class_tokens, '1 1 d -> b 1 d', b=b)  ###### copied from following code
         # concat class tokens
-        x = torch.cat((x,x_class),dim=1)
+        x = torch.cat((x_class, x), dim=1)  # Parteek Swapped from (x, x_class)
+        x += self.position[:, :(n + 1)]  # Parteek added
         # and add positional embedding
-        #print(x.shape)
+        # print(x.shape)
         return self.dropout(x)
 
 
@@ -308,29 +310,34 @@ class ViT(nn.Module):
 
     def forward(self, img):
         # patch embedding
+        # print(img.shape) 64, 3, 32, 32
         x = self.to_patch_embedding(img)
         b, n, _ = x.shape
-        #print(x.shape)
+        # print(x.shape) 64, 16, 64
         # concat class token
         cls_tokens = repeat(self.cls_token, '1 1 d -> b 1 d', b=b)
         x = torch.cat((cls_tokens, x), dim=1)
         # add positional embedding
+        # print('After cls_token concat ', x.shape) 64, 17, 64
         x += self.pos_embedding[:, :(n + 1)]
-        #print(x.shape)
+        # print(x.shape) 64, 17, 64 Does it mean that we have 8 patches each of 16 * 8 and 1 cls token
         # apply dropout
         x = self.dropout(x)
 
         # forward through the transformer blocks
         x = self.transformer(x)
+        # print('Transformer', x.shape) 64, 17, 64
 
         # decide if x is the mean of the embedding 
         # or the class token
         x = x.mean(dim=1) if self.pool == 'mean' else x[:, 0]
+        # print('Cls', x.shape) 64, 64
 
         # transfer via an identity layer the cls tokens or the mean
         # to a latent space, which can then be used as input
         # to the mlp head
         x = self.to_latent(x)
+        # print('To Latent', x.shape) 64, 64
         return self.mlp_head(x)
 
 
@@ -364,9 +371,9 @@ class CrossViT(nn.Module):
         # create ImageEmbedder for small and large patches
         # TODO
         self.small_img_emb = ImageEmbedder(dim=sm_dim, image_size=image_size, patch_size=sm_patch_size,
-                                               dropout=emb_dropout)
+                                           dropout=emb_dropout)
         self.larg_img_emb = ImageEmbedder(dim=lg_dim, image_size=image_size, patch_size=lg_patch_size,
-                                               dropout=emb_dropout)
+                                          dropout=emb_dropout)
 
         # create MultiScaleEncoder
         self.multi_scale_encoder = MultiScaleEncoder(
@@ -400,24 +407,21 @@ class CrossViT(nn.Module):
         # TODO
         small_patch_tokens = self.small_img_emb(img)
         large_patch_tokens = self.larg_img_emb(img)
-        ###feed these to make dimention same
+        # feed these to make dimensions same
         # print(small_patch_tokens)
         # print(large_patch_tokens)
 
         # and the multi-scale encoder
         # TODO
-        sm_tokens ,lg_tokens = self.multi_scale_encoder(small_patch_tokens,large_patch_tokens)
-        ##get class tokens first column class is same
+        sm_tokens, lg_tokens = self.multi_scale_encoder(small_patch_tokens, large_patch_tokens)
+        # get class tokens first column class is same
         # sm_cls = [token[:, 0] for token in (sm_tokens, lg_tokens)]
         # lg_cls = [token[:, 0] for token in (sm_tokens, lg_tokens)]
-        #sm_cls, lg_cls = [token[0][:, 0] for token in zip(sm_tokens, lg_tokens)]
+        # sm_cls, lg_cls = [token[0][:, 0] for token in zip(sm_tokens, lg_tokens)]
         # TODO
         sm_cls, lg_cls = map(lambda token: token[:, 0], (sm_tokens, lg_tokens))
         # print(sm_cls.shape)
         # print(lg_cls)
-
-
-
 
         sm_logits = self.sm_mlp_head(sm_cls)
         lg_logits = self.lg_mlp_head(lg_cls)

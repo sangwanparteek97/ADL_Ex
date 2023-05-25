@@ -73,7 +73,7 @@ def run(args):
                                     ])
 
     # TODO: adjust folder
-    dataset = datasets.CIFAR10('/adjust/your/cifar10/folder', download=True, train=True, transform=transform)
+    dataset = datasets.CIFAR10('/home/cip/ai2022/qi27ycyt/adl23/ex_01/cifar10/data', download=True, train=True, transform=transform)
     trainset, valset = torch.utils.data.random_split(dataset,
                                                      [int(len(dataset) * 0.9), len(dataset) - int(len(dataset) * 0.9)])
     trainloader = DataLoader(trainset, batch_size=64, shuffle=True)
@@ -81,7 +81,7 @@ def run(args):
 
     # Download and load the test data
     # TODO: adjust folder
-    testset = datasets.CIFAR10('/adjust/your/cifar10/folder/', download=True, train=False, transform=transform)
+    testset = datasets.CIFAR10('/home/cip/ai2022/qi27ycyt/adl23/ex_01/cifar10/data', download=True, train=False, transform=transform)
     testloader = DataLoader(testset, batch_size=64, shuffle=True)
 
     # Build a feed-forward network
@@ -130,3 +130,4 @@ if __name__ == '__main__':
 
 ## --batch-size 128 --lr 0.009 --model vit --epochs 50 for vit
 ###--batch-size 400 --lr 0.01  for Resnet
+## --batch-size 128 --lr 0.009 --model crossvit --epochs 100 67% before swapping 64%
