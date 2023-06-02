@@ -23,6 +23,9 @@ def num_to_groups(num, divisor):
 
 
 class Residual(nn.Module):
+    '''
+    Residual block which adds the input to the output of a function
+    '''
     def __init__(self, fn):
         super().__init__()
         self.fn = fn
@@ -32,6 +35,12 @@ class Residual(nn.Module):
 
 
 def Upsample(dim, dim_out=None):
+    '''
+    Upsamples the input by a factor of 2
+    :param dim:
+    :param dim_out: the output dimensionality
+    :return: Sequential layer of upsampling and convolution
+    '''
     return nn.Sequential(
         nn.Upsample(scale_factor=2, mode="nearest"),
         nn.Conv2d(dim, default(dim_out, dim), 3, padding=1),
@@ -47,6 +56,14 @@ def Downsample(dim, dim_out=None):
 
 
 def extract(a, t, x_shape):
+    '''
+    Returns a specific index t of a passed list of values "a" while considering
+    the batch dimension
+    :param a:
+    :param t:
+    :param x_shape:
+    :return:
+    '''
     batch_size = t.shape[0]
     out = a.gather(-1, t.cpu())
     return out.reshape(batch_size, *((1,) * (len(x_shape) - 1))).to(t.device)
