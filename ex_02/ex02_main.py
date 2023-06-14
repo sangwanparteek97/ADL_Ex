@@ -7,8 +7,11 @@ from torchvision import datasets, transforms
 from tqdm import tqdm
 import numpy as np
 from pathlib import Path
+from torchvision.utils import make_grid
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 import os
-
+import random
 from ex02_model import Unet
 from ex02_diffusion import Diffusion, linear_beta_schedule
 from torchvision.utils import save_image
@@ -32,14 +35,44 @@ def parse_args():
     return parser.parse_args()
 
 
-def sample_and_save_images(n_images, diffusor, model, device, store_path):
+def sample_and_save_images(n_images, diffusor, model, device, args,store_path,num_classes):
     # TODO: Implement - adapt code and method signature as needed
-    pass
+    model.eval()
+    #Images = diffusor.sample(model, 32, batch_size=n_images, channels=3)
+    if args.run_name=="classifier_free_guidance":
+        w=7
+        image_classes=torch.randint(0, num_classes, (n_images,)).cuda()
+        Images = diffusor.sample(model=model,image_size=32,batch_size=n_images,classes=image_classes,w=w)
+    else:
+        Images = diffusor.sample(model=model,image_size=32,batch_size=n_images)
+
+    # for i, img in enumerate(Images):
+    #     img = (img + 1) / 2  # Normalize image
+    #     img_tensor = torch.from_numpy(img)
+    #     save_path = f"{store_path}/image_{i}.png"  # Modify the path and file name as needed
+    #     save_image(img_tensor, save_path)
+    #     #save_image(img_tensor, store_path, nrow=int(np.sqrt(n_images)))
+    for i,img in enumerate(Images):
+        img_tensor = torch.from_numpy(img)
+        filename="image{}.png".format(i)
+        save_image(img_tensor,store_path+filename)
 
 
 def test(model, testloader, diffusor, device, args):
     # TODO: Implement - adapt code and method signature as needed
-    pass
+    model.eval()
+    test_loss = 0
+    with torch.no_grad():
+        for images, labels in testloader:
+            images = images.to(device)
+            t = torch.randint(0, diffusor.timesteps, (len(images),), device=device).long()
+            if args.run_name=="classifier_free_guidance":
+                loss =  diffusor.p_losses(model, images, t, loss_type="l2",classes=labels).item()
+            else:
+                loss = diffusor.p_losses(model, images,t, loss_type="l2").item()
+            test_loss += loss
+    test_loss /= len(testloader)
+    print('Test Loss: {:.6f}'.format(test_loss))
 
 
 def train(model, trainloader, optimizer, diffusor, epoch, device, args):
@@ -54,7 +87,10 @@ def train(model, trainloader, optimizer, diffusor, epoch, device, args):
 
         # Algorithm 1 line 3: sample t uniformly for every example in the batch
         t = torch.randint(0, timesteps, (len(images),), device=device).long()
-        loss = diffusor.p_losses(model, images, t, loss_type="l2")
+        if args.run_name=="classifier_free_guidance":
+            loss = diffusor.p_losses(model, images, t, loss_type="l2",classes=labels)
+        else:
+            loss = diffusor.p_losses(model, images, t, loss_type="l2")
 
         loss.backward()
         optimizer.step()
@@ -67,9 +103,9 @@ def train(model, trainloader, optimizer, diffusor, epoch, device, args):
             break
 
 
-def test(args):
-    # TODO (2.2): implement testing functionality, including generation of stored images.
-    pass
+# def test(args):
+#     # TODO (2.2): implement testing functionality, including generation of stored images.
+#     pass
 
 
 def run(args):
@@ -78,9 +114,13 @@ def run(args):
     channels = 3
     epochs = args.epochs
     batch_size = args.batch_size
+    num_classes = 10
     device = "cuda" if not args.no_cuda and torch.cuda.is_available() else "cpu"
+    if args.run_name=="classifier_free_guidance":
+        model = Unet(dim=image_size, channels=channels, dim_mults=(1, 2, 4,),class_free_guidance=True,p_uncond=0.2,num_classes=num_classes).to(device)
+    else:
+        model = Unet(dim=image_size, channels=channels, dim_mults=(1, 2, 4,)).to(device)
 
-    model = Unet(dim=image_size, channels=channels, dim_mults=(1, 2, 4,)).to(device)
     optimizer = AdamW(model.parameters(), lr=args.lr)
 
     my_scheduler = lambda x: linear_beta_schedule(0.0001, 0.02, x)
@@ -115,13 +155,45 @@ def run(args):
 
     test(model, testloader, diffusor, device, args)
 
-    save_path = "<path/to/my/images>"  # TODO: Adapt to your needs
+    save_path = "/home/cip/ai2022/wu58gudu/ADL_Ex/ex_02/Sample_Images/"  # TODO: Adapt to your needs
     n_images = 8
-    sample_and_save_images(n_images, diffusor, model, device, save_path)
-    torch.save(model.state_dict(), os.path.join("/proj/aimi-adl/models", args.run_name, f"ckpt.pt"))
+    sample_and_save_images(n_images, diffusor, model, device, save_path,num_classes=10)
+    torch.save(model.state_dict(), os.path.join("/home/cip/ai2022/wu58gudu/ADL_Ex/ex_02/models/", args.run_name, f"ckpt.pt"))
 
 
 if __name__ == '__main__':
     args = parse_args()
     # TODO (2.2): Add visualization capabilities
     run(args)
+    save_path = "/home/cip/ai2022/wu58gudu/ADL_Ex/ex_02/"
+    # image_files = [f for f in os.listdir(save_path) if os.path.isfile(os.path.join(save_path, f))]
+    # image_tensors = []
+    image_dir = '/home/cip/ai2022/wu58gudu/ADL_Ex/ex_02/'
+
+    # Get the list of image files
+    image_files = [f for f in os.listdir(image_dir) if f.endswith('.png')]
+
+    # Select 10 random image files
+    selected_image_files = random.sample(image_files, 10)
+
+    # Create a figure with a grid of subplots
+    fig, axes = plt.subplots(2, 5, figsize=(12, 6))
+
+    # Iterate over the selected image files and plot them
+    for i, image_file in enumerate(selected_image_files):
+        # Read the image file
+        image_path = os.path.join(image_dir, image_file)
+        image = plt.imread(image_path)
+
+        # Get the corresponding subplot axes
+        ax = axes[i // 5, i % 5]
+
+        # Plot the image
+        ax.imshow(image)
+        ax.axis('off')
+
+    # Adjust the spacing between subplots
+    plt.subplots_adjust(hspace=0.3, wspace=0.05)
+
+    # Show the plot
+    plt.show()
