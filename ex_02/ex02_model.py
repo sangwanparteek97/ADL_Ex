@@ -74,7 +74,7 @@ class Block(nn.Module):
 
 
 class ResnetBlock(nn.Module):
-    """https://arxiv.org/abs/1512.03385"""
+    """https://arxiv.org/abs/1512.03385 """
 
     def __init__(self, dim, dim_out, *, time_emb_dim=None, classes_emb_dim=None, groups=8):
         super().__init__()
@@ -88,7 +88,6 @@ class ResnetBlock(nn.Module):
         self.res_conv = nn.Conv2d(dim, dim_out, 1) if dim != dim_out else nn.Identity()
 
     def forward(self, x, time_emb=None, class_emb=None):
-
         scale_shift = None
         if exists(self.mlp) and (exists(time_emb) or exists(class_emb)):
             cond_emb = tuple(filter(exists, (time_emb, class_emb)))
@@ -107,7 +106,7 @@ class ResnetBlock(nn.Module):
 class Attention(nn.Module):
     def __init__(self, dim, heads=4, dim_head=32):
         super().__init__()
-        self.scale = dim_head**-0.5
+        self.scale = dim_head ** -0.5
         self.heads = heads
         hidden_dim = dim_head * heads
         self.to_qkv = nn.Conv2d(dim, hidden_dim * 3, 1, bias=False)
@@ -136,7 +135,7 @@ class Attention(nn.Module):
 class LinearAttention(nn.Module):
     def __init__(self, dim, heads=4, dim_head=32):
         super().__init__()
-        self.scale = dim_head**-0.5
+        self.scale = dim_head ** -0.5
         self.heads = heads
         hidden_dim = dim_head * heads
         self.to_qkv = nn.Conv2d(dim, hidden_dim * 3, 1, bias=False)
@@ -177,22 +176,22 @@ class PreNorm(nn.Module):
 # TODO: make yourself familiar with the code that is presented here, as it closely interacts with the rest of the exercise.
 class Unet(nn.Module):
     def __init__(
-        self,
-        dim,
-        num_classes = None, ##added
-        init_dim=None,
-        out_dim=None,
-        dim_mults=(1, 2, 4, 8),
-        channels=3,
-        resnet_block_groups=4,
-        class_free_guidance=False,  # TODO: Incorporate in your code
-        p_uncond=0.2,
+            self,
+            dim,  # based dimesnions used in Unet
+            num_classes=None,   # added
+            init_dim=None,  # initial dimensions used in Unet (default: dim)
+            out_dim=None,
+            dim_mults=(1, 2, 4, 8),  # dimension multipliers for each layer (for each dimension)
+            channels=3,
+            resnet_block_groups=4,
+            class_free_guidance=False,  # TODO: Incorporate in your code
+            p_uncond=0.2,  # Prob. of using unconditional guidance
     ):
         super().__init__()
         self.classifier_free_guidence = class_free_guidance
         # determine dimensions
         self.channels = channels
-        input_channels = channels   # adapted from the original source
+        input_channels = channels  # adapted from the original source
 
         init_dim = default(init_dim, dim)
         self.init_conv = nn.Conv2d(input_channels, init_dim, 1, padding=0)  # changed to 1 and 0 from 7,3
@@ -216,7 +215,7 @@ class Unet(nn.Module):
 
         if self.classifier_free_guidence:
             self.classes_emb = nn.Embedding(num_classes, dim)
-            self.null_classes_emb = nn.Parameter(torch.randn(dim))
+            self.null_classes_emb = nn.Parameter(torch.randn(dim))  # For large datasets it can cause the network, we want to learn it. It is better to be 0
             classes_dim = dim * 4
 
             self.classes_mlp = nn.Sequential(
@@ -226,8 +225,6 @@ class Unet(nn.Module):
             )
         else:
             classes_dim = None
-
-
 
         # layers
         self.downs = nn.ModuleList([])
@@ -241,8 +238,8 @@ class Unet(nn.Module):
             self.downs.append(
                 nn.ModuleList(
                     [
-                        block_klass(dim_in, dim_in, time_emb_dim=time_dim,classes_emb_dim = classes_dim),
-                        block_klass(dim_in, dim_in, time_emb_dim=time_dim,classes_emb_dim = classes_dim),
+                        block_klass(dim_in, dim_in, time_emb_dim=time_dim, classes_emb_dim=classes_dim),
+                        block_klass(dim_in, dim_in, time_emb_dim=time_dim, classes_emb_dim=classes_dim),
                         Residual(PreNorm(dim_in, LinearAttention(dim_in))),
                         Downsample(dim_in, dim_out)
                         if not is_last
@@ -252,9 +249,9 @@ class Unet(nn.Module):
             )
 
         mid_dim = dims[-1]
-        self.mid_block1 = block_klass(mid_dim , mid_dim, time_emb_dim=time_dim,classes_emb_dim = classes_dim)
-        self.mid_attn = Residual(PreNorm(mid_dim , Attention(mid_dim)))
-        self.mid_block2 = block_klass(mid_dim , mid_dim, time_emb_dim=time_dim,classes_emb_dim = classes_dim)
+        self.mid_block1 = block_klass(mid_dim, mid_dim, time_emb_dim=time_dim, classes_emb_dim=classes_dim)
+        self.mid_attn = Residual(PreNorm(mid_dim, Attention(mid_dim)))
+        self.mid_block2 = block_klass(mid_dim, mid_dim, time_emb_dim=time_dim, classes_emb_dim=classes_dim)
 
         for ind, (dim_in, dim_out) in enumerate(reversed(in_out)):
             is_last = ind == (len(in_out) - 1)
@@ -262,8 +259,8 @@ class Unet(nn.Module):
             self.ups.append(
                 nn.ModuleList(
                     [
-                        block_klass(dim_out + dim_in , dim_out, time_emb_dim=time_dim,classes_emb_dim = classes_dim),
-                        block_klass(dim_out + dim_in , dim_out, time_emb_dim=time_dim,classes_emb_dim = classes_dim),
+                        block_klass(dim_out + dim_in, dim_out, time_emb_dim=time_dim, classes_emb_dim=classes_dim),
+                        block_klass(dim_out + dim_in, dim_out, time_emb_dim=time_dim, classes_emb_dim=classes_dim),
                         Residual(PreNorm(dim_out, LinearAttention(dim_out))),
                         Upsample(dim_out, dim_in)
                         if not is_last
@@ -274,10 +271,10 @@ class Unet(nn.Module):
 
         self.out_dim = default(out_dim, channels)
 
-        self.final_res_block = block_klass(dim * 2, dim, time_emb_dim=time_dim,classes_emb_dim = classes_dim)
+        self.final_res_block = block_klass(dim * 2, dim, time_emb_dim=time_dim, classes_emb_dim=classes_dim)
         self.final_conv = nn.Conv2d(dim, self.out_dim, 1)
 
-    def forward(self, x, time,classes,p_uncond=None):
+    def forward(self, x, time, classes=None, p_uncond=None):
         x = self.init_conv(x)
         batch = x.shape[0]
         device = x.device
@@ -294,7 +291,7 @@ class Unet(nn.Module):
         # derive condition, with condition dropout for classifier free guidance
         # print(f'number of classes: {classes}')
         if self.classifier_free_guidence:
-            classes_emb = self.classes_emb(classes)
+            classes_emb = self.classes_emb(classes.to(device))
 
         if cond_drop_prob > 0 and self.classifier_free_guidence:
             keep_mask = prob_mask_like((batch,), 1 - cond_drop_prob, device=device)
@@ -313,25 +310,25 @@ class Unet(nn.Module):
         h = []
 
         for block1, block2, attn, downsample in self.downs:
-            x = block1(x, t,c)
+            x = block1(x, t, c)
             h.append(x)
 
-            x = block2(x, t,c)
+            x = block2(x, t, c)
             x = attn(x)
             h.append(x)
 
             x = downsample(x)
 
-        x = self.mid_block1(x, t,c)
+        x = self.mid_block1(x, t, c)
         x = self.mid_attn(x)
-        x = self.mid_block2(x, t,c)
+        x = self.mid_block2(x, t, c)
 
         for block1, block2, attn, upsample in self.ups:
             x = torch.cat((x, h.pop()), dim=1)
-            x = block1(x, t,c)
+            x = block1(x, t, c)
 
             x = torch.cat((x, h.pop()), dim=1)
-            x = block2(x, t,c)
+            x = block2(x, t, c)
             x = attn(x)
 
             x = upsample(x)
