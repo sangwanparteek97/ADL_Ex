@@ -1,4 +1,4 @@
-## Standard libraries
+#  Standard libraries
 import os
 import numpy as np
 import tqdm
@@ -6,14 +6,14 @@ import pandas as pd
 import argparse
 from typing import Union, Dict
 
-## Imports for plotting
+#  Imports for plotting
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-## Imports for data loading
+#  Imports for data loading
 from pathlib import Path
 
-## PyTorch & DL
+#  PyTorch & DL
 import torch
 import torch.utils.data as data
 import torch.optim as optim
@@ -28,7 +28,7 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
 
-## Misc
+#  Misc
 from sklearn.metrics import roc_auc_score, average_precision_score, precision_recall_curve, auc
 
 from ex03_data import get_datasets, TransformTensorDataset
@@ -285,7 +285,7 @@ def run_training(args) -> pl.LightningModule:
                          ])
     pl.seed_everything(42)
     model = JEM(num_epochs=num_epochs,
-                img_shape=(1, 56, 56),
+                img_shape=(1, 56, 56),  # shape of the images (channels, height, width)
                 batch_size=batch_size,
                 num_classes=num_classes,
                 hidden_features=32,  # size of the hidden dimension in the Shallow CNN model

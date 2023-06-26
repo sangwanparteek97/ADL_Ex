@@ -86,15 +86,14 @@ class Diffusion:
         betas_t = extract(self.betas, t, x.shape)
         sqrt_one_minus_alphas_cumprod_t = extract(self.sqrt_one_minus_alphas_cumprod, t, x.shape)
         sqrt_recip_alphas_t = extract(self.sqrt_recip_alphas, t, x.shape)
-        xt = x
-        theta_xt = model(xt, t, c)
+        theta_xt = model(x, t)  #
         if self.classifier_free_guidence:
-            beta_xt = model(xt, t, c)
+            beta_xt = model(x, t, c)
             xt_new = (1 + w) * beta_xt - w * theta_xt
         else:
             xt_new = theta_xt
         # Use our model (noise predictor) to predict the mean
-        x_t_1 = sqrt_recip_alphas_t * (xt - betas_t * xt_new / sqrt_one_minus_alphas_cumprod_t)
+        x_t_1 = sqrt_recip_alphas_t * (x - betas_t * xt_new / sqrt_one_minus_alphas_cumprod_t)
         # x_t_1 = (1.0 / self.sqrt_alphas_cumprod[t_index]) * (
         #             xt - (self.betas[t_index] / self.sqrt_one_minus_alphas_cumprod[t_index]) * xt_new)
         # TODO (2.2): The method should return the image at timestep t-1.
@@ -127,37 +126,22 @@ class Diffusion:
         return x'''
 
     # Algorithm 2 (including returning all images)
-    '''@torch.no_grad()
-    def sample(self, model, image_size, batch_size=16, channels=3):
+    @torch.no_grad()
+    def sample(self, model, image_size, batch_size=16, channels=3,classes=None,w=None):
         # TODO (2.2): Implement the full reverse diffusion loop from random noise to an image, iteratively ''reducing'' the noise in the generated image.
-        # noise = torch.randn(batch_size, channels, image_size, image_size).to(self.device)
-        # z = torch.zeros_like(noise)  ##zeros or rand
-        # Images = []
         # # TODO (2.2): Return the generated images
-        # for t in reversed(range(self.timesteps)):
-        #     xt = noise
-        #     if t > 0:
-        #         z = torch.randn_like(noise)
-        #
-        #     theta_xt = model(xt, t)
-        #     x_t_1 = torch.sqrt(1.0 / self.alphas[t]) * (
-        #                 xt - ((1.0 - self.alphas[t]) / self.central_betas[t] ) * theta_xt) + \
-        #             self.sqrt_reciprocal_betas[t] * z
-        #     noise = x_t_1
-        #     Images.append(x_t_1)
-        #
-        # return Images
+
         device = next(model.parameters()).device
         b = batch_size
         img = torch.randn(batch_size, channels, image_size, image_size).to(self.device)
         imgs = []
 
         for i in tqdm(reversed(range(0, self.timesteps)), desc='sampling loop time step', total=self.timesteps):
-            img = self.p_sample(model, img, torch.full((b,), i, device=device, dtype=torch.long), i)
+            img = self.p_sample(model, img, torch.full((b,), i, device=device, dtype=torch.long), i,classes,w)
             imgs.append(img.cpu().numpy())
-        return imgs'''
+        return imgs
 
-    @torch.no_grad()
+    '''@torch.no_grad()
     def sample(self, model, image_size, batch_size=16, channels=3, return_final_img=False, classes=None, w=None):
         # TODO (2.2): Implement the full reverse diffusion loop from random noise to an image, iteratively ''reducing'' the noise in the generated image.
 
@@ -175,7 +159,7 @@ class Diffusion:
 
         # TODO (2.2): Return the generated images
         stack_img = torch.stack(imgs, dim=1)
-        return stack_img, img
+        return stack_img, img'''
 
     '''@torch.no_grad()
     def sample(self, model, n):

@@ -37,16 +37,16 @@ def parse_args():
     return parser.parse_args()
 
 
-def sample_and_save_images(n_images, diffusor, model, device, store_path, args, num_classes):
-    '''# TODO: Implement - adapt code and method signature as needed
+def sample_and_save_images(n_images, diffusor, model, device, store_path,args,num_classes):
+    # TODO: Implement - adapt code and method signature as needed
     model.eval()
     #Images = diffusor.sample(model, 32, batch_size=n_images, channels=3)
-    if args.run_name == "classifier_free_guidance":
-        w = 7
-        image_classes = torch.randint(0, num_classes, (n_images,)).cuda()
-        images = diffusor.sample(model=model, image_size=32, batch_size=n_images, classes=image_classes, w=w)
+    if args.run_name=="classifier_free_guidance":
+        w=7
+        image_classes=torch.randint(0, num_classes, (n_images,)).cuda()
+        Images = diffusor.sample(model=model,image_size=32,batch_size=n_images,classes=image_classes,w=w)
     else:
-        images = diffusor.sample(model=model, image_size=32, batch_size=n_images)
+        Images = diffusor.sample(model=model,image_size=32,batch_size=n_images)
 
     # for i, img in enumerate(Images):
     #     img = (img + 1) / 2  # Normalize image
@@ -54,37 +54,10 @@ def sample_and_save_images(n_images, diffusor, model, device, store_path, args, 
     #     save_path = f"{store_path}/image_{i}.png"  # Modify the path and file name as needed
     #     save_image(img_tensor, save_path)
     #     #save_image(img_tensor, store_path, nrow=int(np.sqrt(n_images)))
-    for i, img in enumerate(images):
+    for i,img in enumerate(Images):
         img_tensor = torch.from_numpy(img)
-        filename = "image{}.png".format(i)
-        save_image(img_tensor,store_path+filename)'''
-    if args.run_name == "classifier_free_guidance":
-        w = 7
-        image_classes = torch.randint(0, num_classes, (n_images,)).cuda()
-        stacked_images, final_img = diffusor.sample(model=model, image_size=32, batch_size=n_images,
-                                                    classes=image_classes, w=w)
-    else:
-        stacked_images, final_img = diffusor.sample(model=model, image_size=32, batch_size=n_images)
-
-    grid = vutils.make_grid(final_img, nrow=int(n_images ** 0.5), padding=2, normalize=True)
-    grid_np = grid.cpu().numpy()
-    plt.imsave(store_path + "all.png", np.transpose(grid_np, (1, 2, 0)))
-
-    for i, img in enumerate(final_img):
-        filename = "image{}.png".format(i)
-        save_image(img, store_path + filename)
-
-    fig = plt.figure()
-    imgs = []
-    print("Stacked images ,", stacked_images.shape)
-
-    timesteps = stacked_images.shape[1]
-    for i in range(timesteps):
-        im = plt.imshow(np.transpose(stacked_images[0][i].squeeze().cpu().numpy(), (1, 2, 0)), animated=True)
-        imgs.append([im])
-    animate = animation.ArtistAnimation(fig, imgs, interval=200, blit=True, repeat_delay=1000)
-    animate.save(store_path + 'diffusion.gif', writer='pillow')
-    plt.close(fig)
+        filename="image{}.png".format(i)
+        save_image(img_tensor,store_path+filename)
 
 
 
@@ -186,7 +159,7 @@ def run(args):
 
     test(model, testloader, diffusor, device, args)
 
-    store_path = "/home/cip/ai2022/qi27ycyt/adl23/ex_02/Sample_Images_02/"  # TODO: Adapt to your needs
+    store_path = "/home/cip/ai2022/qi27ycyt/adl23/ex_02/Sample_Images/"  # TODO: Adapt to your needs
     n_images = 8
     sample_and_save_images(n_images, diffusor, model, device, store_path, args, num_classes=10)
     torch.save(model.state_dict(), os.path.join("/home/cip/ai2022/qi27ycyt/adl23/ex_02/models/", args.run_name, f"ckpt.pt"))
