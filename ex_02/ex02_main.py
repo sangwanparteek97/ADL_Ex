@@ -6,11 +6,9 @@ from torchvision.transforms import Compose, ToTensor, Lambda, ToPILImage, Center
 from torchvision import datasets, transforms
 from tqdm import tqdm
 import numpy as np
-import torchvision.utils as vutils
 from pathlib import Path
 from torchvision.utils import make_grid
 import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
 import matplotlib.animation as animation
 import os
 import random
@@ -37,7 +35,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def sample_and_save_images(n_images, diffusor, model, device, store_path,args,num_classes):
+def sample_and_save_images(n_images, diffusor, model, device, args,store_path,num_classes):
     # TODO: Implement - adapt code and method signature as needed
     model.eval()
     #Images = diffusor.sample(model, 32, batch_size=n_images, channels=3)
@@ -60,7 +58,6 @@ def sample_and_save_images(n_images, diffusor, model, device, store_path,args,nu
         save_image(img_tensor,store_path+filename)
 
 
-
 def test(model, testloader, diffusor, device, args):
     # TODO: Implement - adapt code and method signature as needed
     model.eval()
@@ -69,8 +66,8 @@ def test(model, testloader, diffusor, device, args):
         for images, labels in testloader:
             images = images.to(device)
             t = torch.randint(0, diffusor.timesteps, (len(images),), device=device).long()
-            if args.run_name == "classifier_free_guidance":
-                loss = diffusor.p_losses(model, images, t, loss_type="l2", classes=labels).item()
+            if args.run_name=="classifier_free_guidance":
+                loss =  diffusor.p_losses(model, images, t, loss_type="l2",classes=labels).item()
             else:
                 loss = diffusor.p_losses(model, images,t, loss_type="l2").item()
             test_loss += loss
@@ -90,8 +87,8 @@ def train(model, trainloader, optimizer, diffusor, epoch, device, args):
 
         # Algorithm 1 line 3: sample t uniformly for every example in the batch
         t = torch.randint(0, timesteps, (len(images),), device=device).long()
-        if args.run_name == "classifier_free_guidance":
-            loss = diffusor.p_losses(model, images, t, loss_type="l2", classes=labels)
+        if args.run_name=="classifier_free_guidance":
+            loss = diffusor.p_losses(model, images, t, loss_type="l2",classes=labels)
         else:
             loss = diffusor.p_losses(model, images, t, loss_type="l2")
 
@@ -100,7 +97,7 @@ def train(model, trainloader, optimizer, diffusor, epoch, device, args):
 
         if step % args.log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch + 1, step * len(images), len(trainloader.dataset),
+                epoch, step * len(images), len(trainloader.dataset),
                 100. * step / len(trainloader), loss.item()))
         if args.dry_run:
             break
@@ -119,9 +116,8 @@ def run(args):
     batch_size = args.batch_size
     num_classes = 10
     device = "cuda" if not args.no_cuda and torch.cuda.is_available() else "cpu"
-    if args.run_name == "classifier_free_guidance":
-        model = Unet(dim=image_size, channels=channels, dim_mults=(1, 2, 4,), class_free_guidance=True, p_uncond=0.2,
-                     num_classes=num_classes).to(device)
+    if args.run_name=="classifier_free_guidance":
+        model = Unet(dim=image_size, channels=channels, dim_mults=(1, 2, 4,),class_free_guidance=True,p_uncond=0.2,num_classes=num_classes).to(device)
     else:
         model = Unet(dim=image_size, channels=channels, dim_mults=(1, 2, 4,)).to(device)
 
@@ -159,29 +155,29 @@ def run(args):
 
     test(model, testloader, diffusor, device, args)
 
-    store_path = "/home/cip/ai2022/qi27ycyt/adl23/ex_02/Sample_Images/"  # TODO: Adapt to your needs
+    save_path = "/home/cip/ai2022/wu58gudu/ADL_Ex/ex_02/Sample_Images/"  # TODO: Adapt to your needs
     n_images = 8
-    sample_and_save_images(n_images, diffusor, model, device, store_path, args, num_classes=10)
-    torch.save(model.state_dict(), os.path.join("/home/cip/ai2022/qi27ycyt/adl23/ex_02/models/", args.run_name, f"ckpt.pt"))
+    sample_and_save_images(n_images, diffusor, model, device, save_path,num_classes=10)
+    torch.save(model.state_dict(), os.path.join("/home/cip/ai2022/wu58gudu/ADL_Ex/ex_02/models/", args.run_name, f"ckpt.pt"))
 
 
 if __name__ == '__main__':
     args = parse_args()
     # TODO (2.2): Add visualization capabilities
     run(args)
-    '''save_path = "/home/cip/ai2022/qi27ycyt/adl23/ex_02/Sample_Images/"
+    save_path = "/home/cip/ai2022/wu58gudu/ADL_Ex/ex_02/"
     # image_files = [f for f in os.listdir(save_path) if os.path.isfile(os.path.join(save_path, f))]
     # image_tensors = []
-    image_dir = '/home/cip/ai2022/qi27ycyt/adl23/ex_02/Sample_Images/'
+    image_dir = '/home/cip/ai2022/wu58gudu/ADL_Ex/ex_02/'
 
     # Get the list of image files
     image_files = [f for f in os.listdir(image_dir) if f.endswith('.png')]
 
     # Select 10 random image files
-    selected_image_files = random.sample(image_files, 5)
+    selected_image_files = random.sample(image_files, 10)
 
     # Create a figure with a grid of subplots
-    fig, axes = plt.subplots(5, 1, figsize=(12, 6))
+    fig, axes = plt.subplots(2, 5, figsize=(12, 6))
 
     # Iterate over the selected image files and plot them
     for i, image_file in enumerate(selected_image_files):
@@ -190,8 +186,7 @@ if __name__ == '__main__':
         image = plt.imread(image_path)
 
         # Get the corresponding subplot axes
-        ax = axes[i]
-        # ax = axes[i // 5, i % 5]
+        ax = axes[i // 5, i % 5]
 
         # Plot the image
         ax.imshow(image)
@@ -201,4 +196,4 @@ if __name__ == '__main__':
     plt.subplots_adjust(hspace=0.3, wspace=0.05)
 
     # Show the plot
-    plt.show()'''
+    plt.show()

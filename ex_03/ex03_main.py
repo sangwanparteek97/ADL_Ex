@@ -5,7 +5,7 @@ import tqdm
 import pandas as pd
 import argparse
 from typing import Union, Dict
-
+import random
 #  Imports for plotting
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -82,6 +82,7 @@ class MCMCSampler:
         self.sample_size = sample_size
         self.num_classes = num_classes
         self.cbuffer_size = cbuffer_size
+        self.examples = [(torch.rand((1,) + img_shape) * 2 - 1) for _ in range(self.sample_size)]
 
     def synthesize_samples(self, clabel=None, steps=60, step_size=10, return_img_per_step=False):
         """
@@ -118,8 +119,17 @@ class MCMCSampler:
         # (consider saving that into a field of this class). In this buffer, you store the synthesized samples after
         # each SGLD procedure. In the class-conditional setting, you want to have individual buffers per class.
         # Please make sure that you keep the buffer finite to not run into memory-related problems.
+        if clabel is not None:
+            clabel = clabel.unsqueeze(0) if isinstance(clabel, int) else clabel
+            buffer_idx = clabel.repeat(self.cbuffer_size, 1).T
+        else:
+            buffer_idx = torch.randint(0, self.num_classes, (self.cbuffer_size,))
+        n_new = np.random.binomial(self.sample_size, 0.05)
+        rand_imgs = torch.rand((n_new,) + self.img_shape) * 2 - 1
+        old_imgs = torch.cat(random.choices(self.examples, k=self.sample_size - n_new), dim=0)
+        inp_imgs = torch.cat([rand_imgs, old_imgs], dim=0).detach().to(device)
 
-        inp_imgs = None  # corresponds to the initial sample(s) x^0
+        #inp_imgs = None  # corresponds to the initial sample(s) x^0
         inp_imgs.requires_grad = True
 
         # List for storing generations at each step
@@ -129,18 +139,35 @@ class MCMCSampler:
         for _ in range(steps):
             # (1) Add small noise to the input 'inp_imgs' (normlized to a range of -1 to 1).
             # This corresponds to the Brownian noise that allows to explore the entire parameter space.
+            noise = torch.randn_like(inp_imgs) ## same size of image noise
+            inp_imgs = inp_imgs + step_size * noise
+            inp_imgs.data.clamp_(min=-1.0, max=1.0)
 
             # (2) Calculate gradient-based score function at the current step. In case of the JEM implementation AND
             # class-conditional sampling (which is optional from a methodological point of view), make sure that you
             # plug in some label information as well as we want to calculate E(x,y) and not only E(x).
+            if clabel is not None:
+                logits = -self.model(inp_imgs, clabel)
+            else:
+                logits = -self.model(inp_imgs)
 
             # (3) Perform gradient ascent to regions of higher probability
+            #prob = torch.nn.Softmax(logits)
             # (gradient descent if we consider the energy surface!). You can use the parameter 'step_size' which can be
+            # prob.sum().backward()
+            # inp_imgs.grad.data.clamp_(-0.03, 0.03)
+            logits.sum().backward()
+            #grad = torch.autograd.grad(torch.log(logits), inp_imgs)[0]
+            inp_imgs.grad.data.clamp_(-0.03, 0.03)
             # considered the learning rate of the SGLD update.
+            inp_imgs = inp_imgs + step_size * inp_imgs.grad.data
+            inp_imgs.grad.detach_()
+            inp_imgs.grad.zero_()
+            inp_imgs.data.clamp_(min=-1.0, max=1.0)
 
             # (4) Optional: save (detached) intermediate images in the imgs_per_step variable
             if return_img_per_step:
-                pass
+                imgs_per_step.append(inp_imgs.detach().clone())
 
         for p in self.model.parameters():
             p.requires_grad = True
@@ -148,10 +175,16 @@ class MCMCSampler:
 
         torch.set_grad_enabled(had_gradients_enabled)
 
+        self.examples = list(inp_imgs.to(torch.device("cpu")).chunk(self.sample_size, dim=0)) + self.examples
+        inp_imgs = self.examples[buffer_idx, torch.randint(0, self.cbuffer_size, (self.sample_size,))]
+        #self.examples = self.examples[:self.cbuffer_size]
+
         if return_img_per_step:
             return torch.stack(imgs_per_step, dim=0)
         else:
             return inp_imgs
+
+
 
 
 class JEM(pl.LightningModule):
@@ -220,21 +253,50 @@ class JEM(pl.LightningModule):
 
     def px_step(self, batch, ccond_sample=True):
         # TODO (3.4): Implement p(x) step
-        loss = None
+        real_images, labels = batch
+        added_noise  = torch.randn_like(real_images)
+        real_images += added_noise
+        real_images = real_images.clamp_(min =-1,max =1)
+        fake_images =  self.MCMCSampler.synthesize_samples() # difference?
+        total_image = torch.cat([real_images,fake_images],dim =0)
+        if ccond_sample: ###conditional JEM on
+            scores = score_fn(model=self.cnn, x=total_image,y= labels, score="px")
+        else:
+            scores = score_fn(model = self.cnn,x=total_image, score="px")
+
+        cdiv_loss = real_images.mean() - fake_images.mean()
+        loss = cdiv_loss
         return loss
 
+    # reg_loss = self.hparams.alpha * (real_out ** 2 + fake_out ** 2).mean()
+    # reg_loss = self.hparams.alpha * scores.mean()
+    # loss = reg_loss + cdiv_loss
     def pyx_step(self, batch):
         # TODO (3.4): Implement p(y|x) step
-        loss = None
+        images, labels = batch
+        logits = score_fn(model = self.cnn,x =images,y= labels, score = "py")
+        loss = torch.nn.functional.cross_entropy(logits, labels)
         return loss
 
     def training_step(self, batch, batch_idx):
         # TODO (3.4): Implement joint density p(x,y) step using p(x) and p(y|x)
-        loss = None
+        px_loss = self.px_step(batch)
+        pyx_loss = self.pyx_step(batch)
+        loss = px_loss + pyx_loss
+        self.log("train_loss", loss) ##if we learn against loss then it willl learn joint probability
         return loss
 
+
     def validation_step(self, batch, batch_idx, dataset_idx=None):
-        pass
+        real_imgs, _ = batch
+        fake_imgs = torch.rand_like(real_imgs) * 2 - 1
+
+        inp_imgs = torch.cat([real_imgs, fake_imgs], dim=0)
+        real_out, fake_out = self.cnn(inp_imgs).chunk(2, dim=0)
+
+        cdiv = fake_out.mean() - real_out.mean()
+
+        return cdiv
 
 
 def run_training(args) -> pl.LightningModule:
@@ -424,6 +486,9 @@ def run_ood_analysis(args, ckpt_path: Union[str, Path]):
 
     # TODO (3.6): Solve a binary classification on the soft scores and evaluate and AUROC and/or AUPRC score for
     #  discrimination between the training samples and one of the OOD distributions.
+    with torch.no_grad():
+        for data in ood_ta_loader:
+
 
 
 if __name__ == '__main__':
