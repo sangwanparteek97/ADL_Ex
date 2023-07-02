@@ -260,10 +260,10 @@ class JEM(pl.LightningModule):
          # difference?
 
         if ccond_sample: ###conditional JEM on
-            fake_images = self.MCMCSampler.synthesize_samples(clabel=batch[1])
+            fake_images = self.sampler.synthesize_samples(clabel=batch[1])
             # scores = score_fn(model=self.cnn, x=total_image,y= labels, score="px")
         else:
-            fake_images = self.MCMCSampler.synthesize_samples()
+            fake_images = self.sampler.synthesize_samples()
             # scores = score_fn(model = self.cnn,x=total_image, score="px")
         #total_image = torch.cat([real_images, fake_images], dim=0)
 
@@ -491,20 +491,27 @@ def run_ood_analysis(args, ckpt_path: Union[str, Path]):
     # TODO (3.6): Solve a binary classification on the soft scores and evaluate and AUROC and/or AUPRC score for
     #  discrimination between the training samples and one of the OOD distributions.
     with torch.no_grad():
+        real_img, _ = next(iter(test_loader))
         img_a, _ = next(iter(ood_ta_loader))
         img_b, _ = next(iter(ood_tb_loader))
+        real_img = real_img.to(model.device)
+        real_img_out = model.cnn(real_img)
         img_a = img_a.to(model.device)
         img_b = img_b.to(model.device)
         img_a_out = model.cnn(img_a)
         img_b_out = model.cnn(img_b)
+    real_img_scores = real_img_out.cpu().numpy()
     img_a_scores = img_a_out.cpu().numpy()
     img_b_scores = img_b_out.cpu().numpy()
+    plt.hist(real_img_scores, bins=50, alpha=0.5, label='img_b')
     plt.hist(img_a_scores, bins=50, alpha=0.5, label='img_a')
     plt.hist(img_b_scores, bins=50, alpha=0.5, label='img_b')
     plt.xlabel('Scores')
     plt.ylabel('Frequency')
     plt.title('Distribution of Scores')
     plt.legend()
+    save_path = '/home/cip/ai2022/wu58gudu/ADL_Ex/ex_03/plots/histogram.png'
+    plt.savefig(save_path)
     plt.show()
 
 if __name__ == '__main__':
@@ -514,7 +521,7 @@ if __name__ == '__main__':
     run_training(args)
 
     # 2) Evaluate model
-    ckpt_path: str = ""
+    ckpt_path: str = "/home/cip/ai2022/wu58gudu/ADL_Ex/ex_03/models"
 
     # Classification performance
     run_evaluation(args, ckpt_path)
