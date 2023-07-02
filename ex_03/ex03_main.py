@@ -254,21 +254,25 @@ class JEM(pl.LightningModule):
     def px_step(self, batch, ccond_sample=True):
         # TODO (3.4): Implement p(x) step
         real_images, labels = batch
-        added_noise  = torch.randn_like(real_images)
+        added_noise  = torch.randn_like(real_images) *0.005
         real_images += added_noise
         real_images = real_images.clamp_(min =-1,max =1)
-        fake_images =  self.MCMCSampler.synthesize_samples() # difference?
-        total_image = torch.cat([real_images,fake_images],dim =0)
+         # difference?
+
         if ccond_sample: ###conditional JEM on
-            scores = score_fn(model=self.cnn, x=total_image,y= labels, score="px")
+            fake_images = self.MCMCSampler.synthesize_samples(clabel=batch[1])
+            # scores = score_fn(model=self.cnn, x=total_image,y= labels, score="px")
         else:
-            scores = score_fn(model = self.cnn,x=total_image, score="px")
+            fake_images = self.MCMCSampler.synthesize_samples()
+            # scores = score_fn(model = self.cnn,x=total_image, score="px")
+        #total_image = torch.cat([real_images, fake_images], dim=0)
 
         cdiv_loss = real_images.mean() - fake_images.mean()
-        loss = cdiv_loss
+        reg_loss = self.hparams.alpha * (real_images ** 2 + fake_images ** 2).mean()
+        loss = cdiv_loss + reg_loss
         return loss
 
-    # reg_loss = self.hparams.alpha * (real_out ** 2 + fake_out ** 2).mean()
+
     # reg_loss = self.hparams.alpha * scores.mean()
     # loss = reg_loss + cdiv_loss
     def pyx_step(self, batch):
@@ -487,9 +491,21 @@ def run_ood_analysis(args, ckpt_path: Union[str, Path]):
     # TODO (3.6): Solve a binary classification on the soft scores and evaluate and AUROC and/or AUPRC score for
     #  discrimination between the training samples and one of the OOD distributions.
     with torch.no_grad():
-        for data in ood_ta_loader:
-
-
+        img_a, _ = next(iter(ood_ta_loader))
+        img_b, _ = next(iter(ood_tb_loader))
+        img_a = img_a.to(model.device)
+        img_b = img_b.to(model.device)
+        img_a_out = model.cnn(img_a)
+        img_b_out = model.cnn(img_b)
+    img_a_scores = img_a_out.cpu().numpy()
+    img_b_scores = img_b_out.cpu().numpy()
+    plt.hist(img_a_scores, bins=50, alpha=0.5, label='img_a')
+    plt.hist(img_b_scores, bins=50, alpha=0.5, label='img_b')
+    plt.xlabel('Scores')
+    plt.ylabel('Frequency')
+    plt.title('Distribution of Scores')
+    plt.legend()
+    plt.show()
 
 if __name__ == '__main__':
     args = parse_args()
