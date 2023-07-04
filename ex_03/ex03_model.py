@@ -50,8 +50,11 @@ class ShallowCNN(nn.Module):
 
         # (2) Unconditional JEM
         if y.dim() == 0:
-            y = y.view(1)
+            return torch.exp(logits).sum(dim=1)
+
         # (3) Conditional JEM
-        y_one_hot = F.one_hot(y, num_classes=self.fc_layers[1].out_features).float()
+        else:
+            return torch.exp(logits[:, y])
+        '''y_one_hot = F.one_hot(y, num_classes=self.fc_layers[1].out_features).float()
         cond_logits = (logits * y_one_hot).sum(dim=1)
-        return cond_logits
+        return cond_logits'''

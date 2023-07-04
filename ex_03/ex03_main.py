@@ -38,7 +38,7 @@ from ex03_ood import score_fn
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Configure training/inference/sampling for EBMs')
-    parser.add_argument('--data_dir', type=str, default="./data",
+    parser.add_argument('--data_dir', type=str, default="./proj/aimi-adl/GLYPHS/",
                         help='path to directory with glyph image data')
     parser.add_argument('--ckpt_dir', type=str, default="./saved_models",
                         help='path to directory where model checkpoints are stored')
@@ -254,7 +254,7 @@ class JEM(pl.LightningModule):
     def px_step(self, batch, ccond_sample=True):
         # TODO (3.4): Implement p(x) step
         real_images, labels = batch
-        added_noise  = torch.randn_like(real_images) *0.005
+        added_noise = torch.randn_like(real_images) *0.005
         real_images += added_noise
         real_images = real_images.clamp_(min =-1,max =1)
          # difference?
@@ -331,6 +331,7 @@ def run_training(args) -> pl.LightningModule:
     os.makedirs(ckpt_dir, exist_ok=True)
 
     # Datasets & Dataloaders
+    # print(data_dir)
     datasets: Dict[str, TransformTensorDataset] = get_datasets(data_dir)
     train_loader = data.DataLoader(datasets['train'], batch_size=batch_size, shuffle=True, drop_last=True,
                                    num_workers=num_workers, pin_memory=True)
@@ -338,7 +339,7 @@ def run_training(args) -> pl.LightningModule:
                                  num_workers=num_workers)
 
     trainer = pl.Trainer(default_root_dir=ckpt_dir,
-                         gpus=1 if str(device).startswith("cuda") else 0,
+                         # gpus=1 if str(device).startswith("cuda") else 0,
                          max_epochs=num_epochs,
                          gradient_clip_val=0.1,
                          callbacks=[
