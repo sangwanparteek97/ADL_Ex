@@ -82,7 +82,7 @@ class MCMCSampler:
         self.sample_size = sample_size
         self.num_classes = num_classes
         self.cbuffer_size = cbuffer_size
-        self.examples = [(torch.rand((1,) + img_shape) * 2 - 1) for _ in range(self.sample_size)]
+        self.examples = [(torch.rand((1,) + img_shape) * 2 - 1) for _ in range(self.sample_size)] ##cbuffer*no output
 
     def synthesize_samples(self, clabel=None, steps=60, step_size=10, return_img_per_step=False):
         """
@@ -119,11 +119,12 @@ class MCMCSampler:
         # (consider saving that into a field of this class). In this buffer, you store the synthesized samples after
         # each SGLD procedure. In the class-conditional setting, you want to have individual buffers per class.
         # Please make sure that you keep the buffer finite to not run into memory-related problems.
+        ##define buffer size =len(self.ecxpmle) else cbufeer
         if clabel is not None:
             clabel = clabel.unsqueeze(0) if isinstance(clabel, int) else clabel
             buffer_idx = clabel.repeat(self.cbuffer_size, 1).T
         else:
-            buffer_idx = torch.randint(0, self.num_classes, (self.cbuffer_size,))
+            buffer_idx = torch.randint(0, self.num_classes, (self.cbuffer_size,))### buffer, sample_size
         n_new = np.random.binomial(self.sample_size, 0.05)
         rand_imgs = torch.rand((n_new,) + self.img_shape) * 2 - 1
         old_imgs = torch.cat(random.choices(self.examples, k=self.sample_size - n_new), dim=0)
@@ -139,7 +140,7 @@ class MCMCSampler:
         for _ in range(steps):
             # (1) Add small noise to the input 'inp_imgs' (normlized to a range of -1 to 1).
             # This corresponds to the Brownian noise that allows to explore the entire parameter space.
-            noise = torch.randn_like(inp_imgs) ## same size of image noise
+            noise = torch.randn_like(inp_imgs)*0.005 ## same size of image noise  normal
             inp_imgs = inp_imgs + step_size * noise
             inp_imgs.data.clamp_(min=-1.0, max=1.0)
 
@@ -260,6 +261,7 @@ class JEM(pl.LightningModule):
          # difference?
 
         if ccond_sample: ###conditional JEM on
+            #sample randomly 0,numclsses,(batch_size)
             fake_images = self.sampler.synthesize_samples(clabel=batch[1])
             # scores = score_fn(model=self.cnn, x=total_image,y= labels, score="px")
         else:
@@ -267,7 +269,7 @@ class JEM(pl.LightningModule):
             # scores = score_fn(model = self.cnn,x=total_image, score="px")
         #total_image = torch.cat([real_images, fake_images], dim=0)
 
-        cdiv_loss = real_images.mean() - fake_images.mean()
+        cdiv_loss = real_images.mean() - fake_images.mean() ##swap
         reg_loss = self.hparams.alpha * (real_images ** 2 + fake_images ** 2).mean()
         loss = cdiv_loss + reg_loss
         return loss
@@ -278,13 +280,17 @@ class JEM(pl.LightningModule):
     def pyx_step(self, batch):
         # TODO (3.4): Implement p(y|x) step
         images, labels = batch
-        logits = score_fn(model = self.cnn,x =images,y= labels, score = "py")
+        ##add noise immages
+        #clamp
+        ##logits cnn.getlogits
+        ###logits = score_fn(model = self.cnn,x =images,y= labels, score = "py")
         loss = torch.nn.functional.cross_entropy(logits, labels)
+        ##update train matrix self.train_metrics.update(logits,real_y)
         return loss
 
     def training_step(self, batch, batch_idx):
         # TODO (3.4): Implement joint density p(x,y) step using p(x) and p(y|x)
-        px_loss = self.px_step(batch)
+        px_loss = self.px_step(batch,ccond_sample= self.ccond_sample)
         pyx_loss = self.pyx_step(batch)
         loss = px_loss + pyx_loss
         self.log("train_loss", loss) ##if we learn against loss then it willl learn joint probability
@@ -299,6 +305,9 @@ class JEM(pl.LightningModule):
         real_out, fake_out = self.cnn(inp_imgs).chunk(2, dim=0)
 
         cdiv = fake_out.mean() - real_out.mean()
+        #logits for real_images
+        ##update hp metric
+        #logg loss
 
         return cdiv
 
@@ -491,14 +500,16 @@ def run_ood_analysis(args, ckpt_path: Union[str, Path]):
     # TODO (3.6): Solve a binary classification on the soft scores and evaluate and AUROC and/or AUPRC score for
     #  discrimination between the training samples and one of the OOD distributions.
     with torch.no_grad():
+        ## for complte data for loop
         real_img, _ = next(iter(test_loader))
+        ##clamp values
         img_a, _ = next(iter(ood_ta_loader))
         img_b, _ = next(iter(ood_tb_loader))
         real_img = real_img.to(model.device)
         real_img_out = model.cnn(real_img)
         img_a = img_a.to(model.device)
         img_b = img_b.to(model.device)
-        img_a_out = model.cnn(img_a)
+        img_a_out = model.cnn(img_a) ##score function
         img_b_out = model.cnn(img_b)
     real_img_scores = real_img_out.cpu().numpy()
     img_a_scores = img_a_out.cpu().numpy()
