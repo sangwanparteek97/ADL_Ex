@@ -122,9 +122,9 @@ class MCMCSampler:
         ##define buffer size =len(self.ecxpmle) else cbufeer
         if clabel is not None:
             clabel = clabel.unsqueeze(0) if isinstance(clabel, int) else clabel
-            buffer_idx = clabel.repeat(self.cbuffer_size, 1).T
+            buffer_idx = clabel.repeat(self.sample_size, 1).T
         else:
-            buffer_idx = torch.randint(0, self.num_classes, (self.cbuffer_size,))### buffer, sample_size
+            buffer_idx = torch.randint(0, self.cbuffer_size, (self.sample_size,))### buffer, sample_size
         n_new = np.random.binomial(self.sample_size, 0.05)
         rand_imgs = torch.rand((n_new,) + self.img_shape) * 2 - 1
         old_imgs = torch.cat(random.choices(self.examples, k=self.sample_size - n_new), dim=0)
@@ -266,8 +266,7 @@ class JEM(pl.LightningModule):
             # scores = score_fn(model=self.cnn, x=total_image,y= labels, score="px")
         else:
             fake_images = self.sampler.synthesize_samples()
-            # scores = score_fn(model = self.cnn,x=total_image, score="px")
-        #total_image = torch.cat([real_images, fake_images], dim=0)
+
 
         cdiv_loss = real_images.mean() - fake_images.mean() ##swap
         reg_loss = self.hparams.alpha * (real_images ** 2 + fake_images ** 2).mean()
@@ -281,11 +280,15 @@ class JEM(pl.LightningModule):
         # TODO (3.4): Implement p(y|x) step
         images, labels = batch
         ##add noise immages
+        added_noise = torch.randn_like(images) * 0.005
+        images = images + added_noise
         #clamp
+        images.data.clamp_(min=-1.0, max=1.0)
         ##logits cnn.getlogits
-        ###logits = score_fn(model = self.cnn,x =images,y= labels, score = "py")
+        logits = self.cnn.get_logits(images)
         loss = torch.nn.functional.cross_entropy(logits, labels)
         ##update train matrix self.train_metrics.update(logits,real_y)
+        self.train_metrics.update(logits,labels)
         return loss
 
     def training_step(self, batch, batch_idx):
@@ -306,8 +309,11 @@ class JEM(pl.LightningModule):
 
         cdiv = fake_out.mean() - real_out.mean()
         #logits for real_images
+        logits = self.cnn.get_logits(real_imgs)
         ##update hp metric
+        self.hp_metric(logits)
         #logg loss
+
 
         return cdiv
 
@@ -510,8 +516,8 @@ def run_ood_analysis(args, ckpt_path: Union[str, Path]):
         real_img_out = model.cnn(real_img)
         img_a = img_a.to(model.device)
         img_b = img_b.to(model.device)
-        img_a_out = model.cnn(img_a) ##score function
-        img_b_out = model.cnn(img_b)
+        img_a_out = score_fn(img_a) ##score function
+        img_b_out = score_fn(img_b)
     real_img_scores = real_img_out.cpu().numpy()
     img_a_scores = img_a_out.cpu().numpy()
     img_b_scores = img_b_out.cpu().numpy()
