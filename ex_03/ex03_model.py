@@ -39,7 +39,7 @@ class ShallowCNN(nn.Module):
         ##
         features = self.cnn_layers(x)
         features = F.adaptive_avg_pool2d(features, (1, 1))
-        logits = self.fc_layers(features).squeez(dim=1) #33 one dim squeez
+        logits = self.fc_layers(features).squeeze(dim=1) #33 one dim squeez
         return logits
 
     def forward(self, x, y=None) -> torch.Tensor:

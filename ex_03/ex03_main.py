@@ -82,7 +82,7 @@ class MCMCSampler:
         self.sample_size = sample_size
         self.num_classes = num_classes
         self.cbuffer_size = cbuffer_size
-        self.examples = [(torch.rand((1,) + img_shape) * 2 - 1) for _ in range(self.sample_size)] ##cbuffer*no output
+        self.examples = [(torch.rand((1,) + img_shape) * 2 - 1) for _ in range(self.cbuffer_size*self.num_classes)] ##cbuffer*classes
 
     def synthesize_samples(self, clabel=None, steps=60, step_size=10, return_img_per_step=False):
         """
@@ -119,14 +119,15 @@ class MCMCSampler:
         # (consider saving that into a field of this class). In this buffer, you store the synthesized samples after
         # each SGLD procedure. In the class-conditional setting, you want to have individual buffers per class.
         # Please make sure that you keep the buffer finite to not run into memory-related problems.
-        ##define buffer size =len(self.ecxpmle) else cbufeer
+        buffer_size =len(self.examples) if clabel is None else self.cbuffer_size
         if clabel is not None:
             clabel = clabel.unsqueeze(0) if isinstance(clabel, int) else clabel
-            buffer_idx = clabel.repeat(self.sample_size, 1).T
+            buffer_idx = clabel.repeat(buffer_size, 1).T
         else:
-            buffer_idx = torch.randint(0, self.cbuffer_size, (self.sample_size,))### buffer, sample_size
+            buffer_idx = torch.randint(0, buffer_size, (self.sample_size,))### buffer, sample_size
         n_new = np.random.binomial(self.sample_size, 0.05)
         rand_imgs = torch.rand((n_new,) + self.img_shape) * 2 - 1
+        #inp_imgs = self.examples[buffer_idx, torch.randint(0, self.cbuffer_size, (self.sample_size,))]
         old_imgs = torch.cat(random.choices(self.examples, k=self.sample_size - n_new), dim=0)
         inp_imgs = torch.cat([rand_imgs, old_imgs], dim=0).detach().to(device)
 
@@ -261,6 +262,7 @@ class JEM(pl.LightningModule):
          # difference?
 
         if ccond_sample: ###conditional JEM on
+            #torch.randint(0,self.number_class,(self.batch_size)).to(device)
             #sample randomly 0,numclsses,(batch_size)
             fake_images = self.sampler.synthesize_samples(clabel=batch[1])
             # scores = score_fn(model=self.cnn, x=total_image,y= labels, score="px")
@@ -271,6 +273,7 @@ class JEM(pl.LightningModule):
         cdiv_loss = real_images.mean() - fake_images.mean() ##swap
         reg_loss = self.hparams.alpha * (real_images ** 2 + fake_images ** 2).mean()
         loss = cdiv_loss + reg_loss
+        self.log("px loss",loss)
         return loss
 
 
@@ -289,6 +292,7 @@ class JEM(pl.LightningModule):
         loss = torch.nn.functional.cross_entropy(logits, labels)
         ##update train matrix self.train_metrics.update(logits,real_y)
         self.train_metrics.update(logits,labels)
+        self.log("pyx_step_loss",loss)
         return loss
 
     def training_step(self, batch, batch_idx):
@@ -313,8 +317,7 @@ class JEM(pl.LightningModule):
         ##update hp metric
         self.hp_metric(logits)
         #logg loss
-
-
+        self.log("valid_loss",cdiv)
         return cdiv
 
 
@@ -506,28 +509,25 @@ def run_ood_analysis(args, ckpt_path: Union[str, Path]):
 
     # TODO (3.6): Solve a binary classification on the soft scores and evaluate and AUROC and/or AUPRC score for
     #  discrimination between the training samples and one of the OOD distributions.
-    with torch.no_grad():
-        ## for complte data for loop
-        real_img, _ = next(iter(test_loader))
-        ##clamp values
-        img_a, _ = next(iter(ood_ta_loader))
-        img_b, _ = next(iter(ood_tb_loader))
-        real_img = real_img.to(model.device)
-        real_img_out = model.cnn(real_img)
-        img_a = img_a.to(model.device)
-        img_b = img_b.to(model.device)
-        img_a_out = score_fn(img_a) ##score function
-        img_b_out = score_fn(img_b)
-    real_img_scores = real_img_out.cpu().numpy()
-    img_a_scores = img_a_out.cpu().numpy()
-    img_b_scores = img_b_out.cpu().numpy()
-    plt.hist(real_img_scores, bins=50, alpha=0.5, label='img_b')
-    plt.hist(img_a_scores, bins=50, alpha=0.5, label='img_a')
-    plt.hist(img_b_scores, bins=50, alpha=0.5, label='img_b')
-    plt.xlabel('Scores')
-    plt.ylabel('Frequency')
-    plt.title('Distribution of Scores')
-    plt.legend()
+    for x, y in test_loader:
+        test_score = []
+        x.clamp(min=-1,max=1)
+        out = score_fn(model= model, x=x, y=y , score= "px")
+        test_score.append(out)
+
+    for x, y in ood_ta_loader:
+        ood_a_score = []
+        x.clamp(min=-1,max=1)
+        out = score_fn(model= model, x=x, y=y , score= "px")
+        ood_a_score.append(out)
+
+    for x, y in ood_tb_loader:
+        ood_b_score = []
+        x.clamp(min=-1, max=1)
+        out = score_fn(model=model, x=x, y=y, score="px")
+        ood_b_score.append(out)
+
+
     save_path = '/home/cip/ai2022/wu58gudu/ADL_Ex/ex_03/plots/histogram.png'
     plt.savefig(save_path)
     plt.show()
