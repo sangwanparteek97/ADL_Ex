@@ -141,7 +141,7 @@ class MCMCSampler:
         for _ in range(steps):
             # (1) Add small noise to the input 'inp_imgs' (normlized to a range of -1 to 1).
             # This corresponds to the Brownian noise that allows to explore the entire parameter space.
-            noise = torch.randn_like(inp_imgs)*0.005 ## same size of image noise  normal
+            noise = torch.randn_like(inp_imgs)*0.005 ## same size of image noise  normal## changes
             inp_imgs = inp_imgs + step_size * noise
             inp_imgs.data.clamp_(min=-1.0, max=1.0)
 
