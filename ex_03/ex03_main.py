@@ -544,6 +544,14 @@ def run_ood_analysis(args, ckpt_path: Union[str, Path]):
         out = score_fn(model=model, x=x, y=y, score="px")
         ood_b_score.append(out)
 
+    plt.hist(test_score, bins=50, alpha=0.5, label='test_score')
+    plt.hist(ood_a_score, bins=50, alpha=0.5, label='ood_a_score')
+    plt.hist(ood_b_score, bins=50, alpha=0.5, label='ood_b_score')
+    plt.xlabel('Scores')
+    plt.ylabel('Frequency')
+    plt.title('Distribution of Scores')
+    plt.legend()
+
     save_path = '/home/cip/ai2022/qi27ycyt/plots/histogram.png'
     plt.savefig(save_path)
     plt.show()
@@ -553,7 +561,7 @@ if __name__ == '__main__':
     args = parse_args()
 
     # 1) Run training
-    run_training(args)
+    #run_training(args)
 
     # 2) Evaluate model
     last_ckpt_dir = args.ckpt_dir + "lightning_logs/version_4/checkpoints/"

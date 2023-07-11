@@ -34,13 +34,12 @@ class ShallowCNN(nn.Module):
 
     def get_logits(self, x):
         # TODO (3.2): Implement classification procedure that outputs the logits across the classes
-        ##cnn_layer(x)
-        ##pooling
-        ##
+        # cnn_layer(x)
+        # pooling
         features = self.cnn_layers(x)
         features = F.adaptive_avg_pool2d(features, (1, 1))
-        logits = self.fc_layers(features).squeeze(dim=1) #33 one dim squeez
-        #print(logits)
+        logits = self.fc_layers(features).squeeze(dim=1) # 33 one dim squeeze
+        # print(logits)
         return logits
 
     def forward(self, x, y=None) -> torch.Tensor:
