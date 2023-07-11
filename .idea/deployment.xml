@@ -1,57 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="wu58gudu@cip4b3.cip.cs.fau.de:22 password (7)" remoteFilesAllowedToDisappearOnAutoupload="false" showNewOnSourceInSync="false" showNewOnTargetInSync="false">
+  <component name="PublishConfigData" serverName="wu58gudu@cip4b3.cip.cs.fau.de:22 password (3)" remoteFilesAllowedToDisappearOnAutoupload="false" showNewOnSourceInSync="false" showNewOnTargetInSync="false">
     <serverData>
-      <paths name="wu58gudu@cip4b3.cip.cs.fau.de:22 password">
+      <paths name="university_cip">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="wu58gudu@cip4b3.cip.cs.fau.de:22 password">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/pycharm_project_145" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>
       <paths name="wu58gudu@cip4b3.cip.cs.fau.de:22 password (2)">
         <serverdata>
           <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/home/cip/ai2022/wu58gudu/ADL_Ex" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>
       <paths name="wu58gudu@cip4b3.cip.cs.fau.de:22 password (3)">
         <serverdata>
           <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="wu58gudu@cip4b3.cip.cs.fau.de:22 password (4)">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="wu58gudu@cip4b3.cip.cs.fau.de:22 password (5)">
-        <serverdata>
-          <mappings>
-            <mapping deploy="/home/cip/ai2022/wu58gudu/ADL_Ex" local="$PROJECT_DIR$" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="wu58gudu@cip4b3.cip.cs.fau.de:22 password (6)">
-        <serverdata>
-          <mappings>
-            <mapping deploy="/home/cip/ai2022/wu58gudu/ADL_Ex" local="$PROJECT_DIR$" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="wu58gudu@cip4b3.cip.cs.fau.de:22 password (7)">
-        <serverdata>
-          <mappings>
-            <mapping deploy="/home/cip/ai2022/wu58gudu/ADL_Ex" local="$PROJECT_DIR$" />
+            <mapping deploy="/ADL_Ex" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>
     </serverData>
-    <option name="myAutoUpload" value="ALWAYS" />
   </component>
 </project>

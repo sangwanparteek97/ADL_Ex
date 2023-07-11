@@ -556,6 +556,16 @@ def run_ood_analysis(args, ckpt_path: Union[str, Path]):
     plt.savefig(save_path)
     plt.show()
 
+    ## AUC
+    labels_test = torch.zeros(len(test_score)) # Assign label 0 to test samples
+    total_OOD_score = torch.cat([ood_a_score,ood_b_score],dim=0)
+    labels_ood = torch.ones(total_OOD_score.shape[0])  # Assign label 1 to OOD samples
+
+    labels = torch.cat([labels_test, labels_ood], dim=0)
+
+    # Calculate AUROC score
+    auroc = roc_auc_score(labels.cpu(), total_OOD_score.cpu())
+
 
 if __name__ == '__main__':
     args = parse_args()
