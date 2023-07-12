@@ -41,7 +41,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Configure training/inference/sampling for EBMs')
     parser.add_argument('--data_dir', type=str, default="/proj/aimi-adl/GLYPHS/",
                         help='path to directory with glyph image data')
-    parser.add_argument('--ckpt_dir', type=str, default="/home/cip/ai2022/qi27ycyt/models/",
+    parser.add_argument('--ckpt_dir', type=str, default="/home/cip/ai2022/wu58gudu/ADL_Ex/ex_03//models/",
                         help='path to directory where model checkpoints are stored')
     parser.add_argument('--batch_size', type=int, default=32,
                         help='input batch size for training (default: 32)')
@@ -83,12 +83,12 @@ class MCMCSampler:
         self.sample_size = sample_size
         self.num_classes = num_classes
         self.cbuffer_size = cbuffer_size
-        self.examples = [(torch.rand((1,) + img_shape) * 2 - 1) for _ in range(self.sample_size)] ##cbuffer*no output
-        self.buffer_u = [(torch.rand((1,) + img_shape) * 2 - 1) for _ in range(self.sample_size)]
+        #self.examples = [(torch.rand((1,) + img_shape) * 2 - 1) for _ in range(self.cbuffer_size * self.num_classes)] ##cbuffer*no output
+        '''self.buffer_u = [(torch.rand((1,) + img_shape) * 2 - 1) for _ in range(self.sample_size)]
         self.buffer_c = {i: [(torch.rand((1,) + img_shape) * 2 - 1) for _ in range(self.sample_size)] for i in
-                         range(self.num_classes)}
-        self.from_buffer_list = np.random.choice([True, False], size=self.sample_size, p=[0.9, 0.1]).tolist()
-
+                       range(self.num_classes)}'''
+        #self.from_buffer_list = np.random.choice([True, False], size=self.sample_size, p=[0.9, 0.1]).tolist()
+        self.examples = [(torch.randn((1,) + self.img_shape[1:]) * 2 - 1) for _ in range(self.num_classes * self.cbuffer_size)]
     def synthesize_samples(self, clabel=None, steps=60, step_size=10, return_img_per_step=False):
         """
         Synthesize images from the current parameterized q_\theta
@@ -125,30 +125,22 @@ class MCMCSampler:
         # each SGLD procedure. In the class-conditional setting, you want to have individual buffers per class.
         # Please make sure that you keep the buffer finite to not run into memory-related problems.
         ##define buffer size =len(self.ecxpmle) else cbufeer
+        n_new = np.random.binomial(self.sample_size, 0.05)
+        rand_imgs = torch.randn((n_new,) + self.img_shape[1:]) * 0.001
+        # 95% samples from Reservoir -> (n_old, h, w)
         if clabel is None:
-            # Unconditional case
-            n_new = np.random.binomial(self.sample_size, 0.1)
-            rand_imgs = torch.rand((n_new,) + self.img_shape) * 2 - 1
-            old_imgs = torch.cat(random.choices(self.buffer_u, k=self.sample_size - n_new), dim=0)
-            inp_imgs = torch.cat([rand_imgs, old_imgs], dim=0).to(device)
-            # inp_imgs = torch.cat([rand_imgs, old_imgs], dim=0).to(device)
+            old_imgs = torch.cat(random.choices(self.examples, k=self.sample_size - n_new), dim=0)
+            inp_imgs = torch.cat([rand_imgs, old_imgs], dim=0).detach().to(device).unsqueeze(1)
+
         else:
-            # Conditional case
-            inp_imgs_list = []
-            for i, label in enumerate(clabel):
-                if self.from_buffer_list[i]:
-                    inp_imgs_class_prev = random.choices(self.buffer_c[label.item()])
-                    inp_imgs_class = inp_imgs_class_prev[0]
-                    # inp_imgs_class = torch.stack(inp_imgs_class)  # Convert list to tensor
-                else:
-                    inp_imgs_class = torch.rand((1,) + self.img_shape) * 2 - 1
+            buffer_idx = torch.randint(0, self.cbuffer_size, (self.sample_size - n_new,))
+            buffer_idx = clabel[:self.sample_size - n_new].cpu() * self.cbuffer_size + buffer_idx
 
-                inp_imgs_list.append(inp_imgs_class)
-            inp_imgs = torch.cat(inp_imgs_list, dim=0).to(device)
+            old_imgs = torch.cat([self.examples[idx] for idx in buffer_idx], dim=0)
+            inp_imgs = torch.cat([rand_imgs, old_imgs], dim=0).detach().to(device).unsqueeze(1)  #total*h*w
 
-        #inp_imgs = None  # corresponds to the initial sample(s) x^0
         inp_imgs.requires_grad = True
-        # print('GRADDDDD: ', inp_imgs.grad)
+        noise = torch.randn(inp_imgs.shape, device=inp_imgs.device)
 
         # List for storing generations at each step
         imgs_per_step = []
@@ -157,7 +149,7 @@ class MCMCSampler:
         for _ in range(steps):
             # (1) Add small noise to the input 'inp_imgs' (normlized to a range of -1 to 1).
             # This corresponds to the Brownian noise that allows to explore the entire parameter space.
-            noise = torch.randn_like(inp_imgs)*0.005 ## same size of image noise  normal
+             ## same size of image noise  normal
             inp_imgs.data.add(noise.data)
             inp_imgs.data.clamp_(min=-1.0, max=1.0)
 
@@ -189,15 +181,15 @@ class MCMCSampler:
             if return_img_per_step:
                 imgs_per_step.append(inp_imgs.clone())
 
+        self.examples = [inp_imgs[idx].to(device="cpu") for idx in range(self.sample_size)] + self.examples
+        # self.examples = list(inp_imgs.to(device="cpu").chunk(self.sample_size, dim=0).squeeze(dim=0)) + self.examples
+        self.examples = self.examples[:self.num_classes * self.cbuffer_size]
+
         for p in self.model.parameters():
             p.requires_grad = True
         self.model.train(is_training)
 
         torch.set_grad_enabled(had_gradients_enabled)
-
-        '''self.examples = list(inp_imgs.to(torch.device("cpu")).chunk(self.sample_size, dim=0)) + self.examples
-        inp_imgs = self.examples[buffer_idx, torch.randint(0, self.cbuffer_size, (self.sample_size,))]'''
-        #self.examples = self.examples[:self.cbuffer_size]
 
         if return_img_per_step:
             return torch.stack(imgs_per_step, dim=0)
@@ -271,68 +263,75 @@ class JEM(pl.LightningModule):
         return [optimizer], [scheduler]
 
     def px_step(self, batch, ccond_sample=True):
-        # TODO (3.4): Implement p(x) step
-        real_images, labels = batch
-        added_noise = torch.randn_like(real_images) *0.005
-        real_images += added_noise
-        real_images = real_images.clamp_(min =-1,max =1)
-         # difference?
+        """
+        maximize log p(x)
 
-        if ccond_sample: ###conditional JEM on
-            # sample randomly 0,numclsses,(batch_size)
-            fake_images = self.sampler.synthesize_samples(clabel=batch[1])
-            # scores = score_fn(model=self.cnn, x=total_image,y= labels, score="px")
+        :param batch: (bs,c,h,w) image
+        :param ccond_sample: True if we want to draw class-conditioned samples.
+        :return: log p(x)
+        """
+        x_p, y_p = batch
+        device = x_p.get_device()
+
+        if ccond_sample:
+            y_q = y_p  # torch.randint(low=0, high=self.num_classes, size=(self.batch_size,)).to(device)
+            x_q = self.sampler.synthesize_samples(clabel=y_q)
         else:
-            fake_images = self.sampler.synthesize_samples()
+            x_q = self.sampler.synthesize_samples(clabel=None)  # sample from log-sumexp
 
-        cdiv_loss = real_images.mean() - fake_images.mean() ##swap
-        reg_loss = self.hparams.alpha * (real_images ** 2 + fake_images ** 2).mean()
-        loss = cdiv_loss + reg_loss
-        return loss
+        output_p_all = -self.cnn(x_p)  # E(x_p) -> (bs,), energy of samples ~ p(x)
+        output_q_all = -self.cnn(x_q)  # E(x_q) -> (bs,), energy of samples ~ q_{\theta}(x)
+        reg_loss = self.hparams.alpha * (output_p_all ** 2 + output_q_all ** 2).mean()
+
+        output_p = output_p_all.mean()
+        output_q = output_q_all.mean()
+        cdiv_loss = (output_p - output_q)  # energy difference, optimally should be 0 with q_{\theta}(x) converging to p(x)
+
+        return reg_loss, cdiv_loss
 
 
     # reg_loss = self.hparams.alpha * scores.mean()
     # loss = reg_loss + cdiv_loss
     def pyx_step(self, batch):
+        """
+
+        :param batch: list [image=(bs,c,h,w), label=(bs,)]
+        :return:
+        """
         # TODO (3.4): Implement p(y|x) step
-        # Here, we want to calculate the classification loss using the class logits infered by the neural network.
-        images, labels = batch
-        ##add noise immages
-        added_noise = torch.randn_like(images) * 0.005
-        images = images + added_noise
-        #clamp
-        images.data.clamp_(min=-1.0, max=1.0)
-        ##logits cnn.getlogits
-        # logits = score_fn(model=self.cnn, x=images, y=labels, score="py")
-        logits = self.cnn.get_logits(images)
-        loss = torch.nn.functional.cross_entropy(logits, labels)
-        ##update train matrix self.train_metrics.update(logits,real_y)
-        self.train_metrics.update(logits,labels)
-        return loss
+        x_p, y_p = batch
+        logits = self.cnn.get_logits(x_p)  # -E(x_p, y_p) -> (bs, num_cls)
+        loss_cross_entropy = torch.nn.CrossEntropyLoss()(logits, y_p)
+        return loss_cross_entropy
 
     def training_step(self, batch, batch_idx):
+        """"
+        :param batch: [(bs,1,56,56), (bs,)]
+        """
         # TODO (3.4): Implement joint density p(x,y) step using p(x) and p(y|x)
-        px_loss = self.px_step(batch,ccond_sample= self.ccond_sample)
-        pyx_loss = self.pyx_step(batch)
-        loss = px_loss + pyx_loss
-        self.log("train_loss", loss) ##if we learn against loss then it will learn joint probability
+        loss_reg, loss_cdiv = self.px_step(batch, ccond_sample=self.ccond_sample)
+        loss_cross_entropy = self.pyx_step(batch)
+        loss = loss_reg + loss_cdiv + loss_cross_entropy
+
+        # Logging
+        self.log('loss_all', loss)
+        self.log('loss_regularization', loss_reg)
+        self.log('loss_contrastive_divergence', loss_cdiv)
+
         return loss
 
     def validation_step(self, batch, batch_idx, dataset_idx=None):
-        real_imgs, real_label = batch
+        real_imgs, real_labels = batch
         fake_imgs = torch.rand_like(real_imgs) * 2 - 1
 
-        inp_imgs = torch.cat([real_imgs, fake_imgs], dim=0)
-        real_out, fake_out = self.cnn(inp_imgs).chunk(2, dim=0)
+        real_out = self.cnn.get_logits(x=real_imgs)
+        fake_out = self.cnn(x=fake_imgs, y=None)
 
         cdiv = fake_out.mean() - real_out.mean()
-        #logits for real_images
-        logits = self.cnn.get_logits(real_imgs)
-        ##update hp metric
-        self.hp_metric(logits, real_label)
-        #logg loss
-        self.log("val_contrastive_divergence", cdiv)
-        return cdiv
+        self.log('val_contrastive_divergence', cdiv)
+
+        precision = self.valid_metrics['MulticlassAveragePrecision'](real_out, real_labels)
+        self.log('val_MulticlassAveragePrecision', precision)
 
 
 def run_training(args) -> pl.LightningModule:
@@ -552,19 +551,9 @@ def run_ood_analysis(args, ckpt_path: Union[str, Path]):
     plt.title('Distribution of Scores')
     plt.legend()
 
-    save_path = '/home/cip/ai2022/qi27ycyt/plots/histogram.png'
+    save_path = '/home/cip/ai2022/wu58gudu/ADL_Ex/ex_03/plots/histogram.png'
     plt.savefig(save_path)
     plt.show()
-
-    ## AUC
-    labels_test = torch.zeros(len(test_score)) # Assign label 0 to test samples
-    total_OOD_score = torch.cat([ood_a_score,ood_b_score],dim=0)
-    labels_ood = torch.ones(total_OOD_score.shape[0])  # Assign label 1 to OOD samples
-
-    labels = torch.cat([labels_test, labels_ood], dim=0)
-
-    # Calculate AUROC score
-    auroc = roc_auc_score(labels.cpu(), total_OOD_score.cpu())
 
 
 if __name__ == '__main__':
@@ -574,7 +563,7 @@ if __name__ == '__main__':
     #run_training(args)
 
     # 2) Evaluate model
-    last_ckpt_dir = args.ckpt_dir + "lightning_logs/version_4/checkpoints/"
+    last_ckpt_dir = args.ckpt_dir + "lightning_logs/version_0/checkpoints/"
     file_path = next((os.path.join(last_ckpt_dir, file) for file in os.listdir(last_ckpt_dir) if file.startswith("last")), None)
     ckpt_path: str = file_path
 
